@@ -8,6 +8,7 @@ pub mod swap;
 pub mod wallet;
 
 use state::AppState;
+use crate::swap::db::open_swap_db;
 
 pub fn run() {
     // Initialize logging
@@ -21,8 +22,24 @@ pub fn run() {
     // Load environment variables
     dotenvy::dotenv().ok();
 
+    // Initialize swap database
+    let swap_db = match open_swap_db() {
+        Ok(conn) => Some(conn),
+        Err(e) => {
+            tracing::warn!("Failed to open swap database: {}", e);
+            None
+        }
+    };
+
+    let app_state = AppState {
+        wallet: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+        sync_state: std::sync::Arc::new(state::SyncState::new()),
+        pending_tx_state: std::sync::Arc::new(state::PendingTxState::new()),
+        swap_db: std::sync::Arc::new(tokio::sync::Mutex::new(swap_db)),
+    };
+
     tauri::Builder::default()
-        .manage(AppState::new())
+        .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // Wallet commands
             commands::wallet::check_wallet_exists,

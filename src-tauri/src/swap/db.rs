@@ -2,6 +2,27 @@
 
 use super::models::{SwapDirection, SwapRecord};
 use rusqlite::Connection;
+use std::path::PathBuf;
+
+/// Get the path to the swap database file
+pub fn swap_db_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".ikki")
+        .join("swaps.db")
+}
+
+/// Open or create the swap database connection
+pub fn open_swap_db() -> Result<Connection, rusqlite::Error> {
+    let path = swap_db_path();
+    // Ensure directory exists
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let conn = Connection::open(&path)?;
+    init_swap_tables(&conn)?;
+    Ok(conn)
+}
 
 /// Initialize swap tables
 pub fn init_swap_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
