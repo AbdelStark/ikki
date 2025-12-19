@@ -504,15 +504,33 @@ impl IkkiWallet {
         Ok(transactions)
     }
 
-    /// Get memo for a transaction from received notes
+    /// Get memo for a transaction from received or sent notes
     fn get_transaction_memo(&self, conn: &rusqlite::Connection, txid_bytes: &[u8]) -> Option<String> {
-        // Try to get memo from Orchard received notes first
+        // Try sent_notes first (for outgoing transactions)
+        let sent_memo: Option<String> = conn
+            .query_row(
+                "SELECT sn.memo
+                FROM sent_notes sn
+                JOIN transactions t ON sn.transaction_id = t.id_tx
+                WHERE t.txid = ? AND sn.memo IS NOT NULL AND length(sn.memo) > 1
+                LIMIT 1",
+                [txid_bytes],
+                |row| row.get(0),
+            )
+            .ok()
+            .and_then(|memo_bytes: Vec<u8>| Self::decode_memo(&memo_bytes));
+
+        if sent_memo.is_some() {
+            return sent_memo;
+        }
+
+        // Try Orchard received notes (for incoming transactions)
         let orchard_memo: Option<String> = conn
             .query_row(
                 "SELECT rn.memo
                 FROM orchard_received_notes rn
-                JOIN transactions t ON rn.tx = t.id_tx
-                WHERE t.txid = ? AND rn.memo IS NOT NULL
+                JOIN transactions t ON rn.transaction_id = t.id_tx
+                WHERE t.txid = ? AND rn.memo IS NOT NULL AND length(rn.memo) > 1
                 LIMIT 1",
                 [txid_bytes],
                 |row| row.get(0),
@@ -529,8 +547,8 @@ impl IkkiWallet {
             .query_row(
                 "SELECT rn.memo
                 FROM sapling_received_notes rn
-                JOIN transactions t ON rn.tx = t.id_tx
-                WHERE t.txid = ? AND rn.memo IS NOT NULL
+                JOIN transactions t ON rn.transaction_id = t.id_tx
+                WHERE t.txid = ? AND rn.memo IS NOT NULL AND length(rn.memo) > 1
                 LIMIT 1",
                 [txid_bytes],
                 |row| row.get(0),
