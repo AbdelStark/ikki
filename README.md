@@ -155,6 +155,8 @@ ikki/
 │       ├── commands/       # IPC handlers
 │       ├── wallet/         # Core wallet
 │       └── state.rs        # App state
+├── tools/
+│   └── ikki-mcp/           # MCP server for Claude Code
 └── public/                 # Static assets
 ```
 
@@ -166,6 +168,50 @@ npm run build        # Build frontend
 npm run tauri dev    # Development mode
 npm run tauri build  # Production build
 ```
+
+### MCP Server for Claude Code
+
+An MCP (Model Context Protocol) server is included for UI automation with Claude Code. It enables screenshot capture, clicking, and typing within the Ikki app window.
+
+**Setup:**
+
+```bash
+cd tools/ikki-mcp
+bun install
+```
+
+**Register with Claude Code:**
+
+```bash
+claude mcp add ikki-automation --scope project -- bun run /path/to/ikki/tools/ikki-mcp/src/index.ts
+```
+
+Or add to `.mcp.json` manually:
+
+```json
+{
+  "mcpServers": {
+    "ikki-automation": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "/path/to/ikki/tools/ikki-mcp/src/index.ts"]
+    }
+  }
+}
+```
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `screenshot` | Capture the app window as base64 image |
+| `click` | Click at window-relative coordinates |
+| `type` | Type text or press special keys |
+| `get_window_info` | Get window position, size, and state |
+
+**Requirements:**
+- macOS with Accessibility and Screen Recording permissions granted to your terminal
+- The Ikki app must be running (`npm run tauri dev` or production build)
 
 ### Key Files
 
