@@ -40,25 +40,42 @@ pub async fn generate_ephemeral_address(
 /// Save a swap record
 #[tauri::command]
 pub async fn save_swap(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     swap: SwapRecord,
 ) -> Result<(), String> {
-    // TODO: Get DB connection and save
-    tracing::info!("Saving swap: {:?}", swap.id);
+    let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+
+    crate::swap::db::save_swap(conn, &swap)
+        .map_err(|e| format!("Failed to save swap: {}", e))?;
+
+    tracing::info!("Saved swap: {:?}", swap.id);
     Ok(())
 }
 
 /// Update swap status
 #[tauri::command]
 pub async fn update_swap_status(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     swap_id: String,
     status: String,
     intent_hash: Option<String>,
     txid: Option<String>,
 ) -> Result<(), String> {
+    let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+
+    crate::swap::db::update_swap_status(
+        conn,
+        &swap_id,
+        &status,
+        intent_hash.as_deref(),
+        txid.as_deref(),
+    )
+    .map_err(|e| format!("Failed to update swap status: {}", e))?;
+
     tracing::info!(
-        "Updating swap {} to status {} (intent: {:?}, txid: {:?})",
+        "Updated swap {} to status {} (intent: {:?}, txid: {:?})",
         swap_id, status, intent_hash, txid
     );
     Ok(())
@@ -67,19 +84,25 @@ pub async fn update_swap_status(
 /// Get swap history
 #[tauri::command]
 pub async fn get_swap_history(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<Vec<SwapRecord>, String> {
-    // TODO: Get from DB
-    Ok(vec![])
+    let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+
+    crate::swap::db::get_swap_history(conn)
+        .map_err(|e| format!("Failed to get swap history: {}", e))
 }
 
 /// Get active (non-terminal) swaps
 #[tauri::command]
 pub async fn get_active_swaps(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<Vec<SwapRecord>, String> {
-    // TODO: Get from DB
-    Ok(vec![])
+    let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+
+    crate::swap::db::get_active_swaps(conn)
+        .map_err(|e| format!("Failed to get active swaps: {}", e))
 }
 
 /// Check transparent address balance (for monitoring deposits/refunds)
