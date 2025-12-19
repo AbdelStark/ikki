@@ -1,15 +1,35 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { Loader2, Clock, Check, X } from "lucide-svelte";
-  import { type Transaction, type PendingTransaction } from "../lib/utils/tauri";
+  import { type Transaction, type PendingTransaction, getSwapHistory } from "../lib/utils/tauri";
   import { pendingTxList } from "../lib/stores/pendingTransactions";
   import { transactions as txStore, transactionsLoading, transactionsLoaded } from "../lib/stores/transactions";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
   import PendingTransactionItem from "../lib/components/PendingTransactionItem.svelte";
+  import SwapHistory from "../lib/components/SwapHistory.svelte";
+  import type { SwapRecord } from "../lib/types/swap";
 
   // Use global transactions store
   $: transactions = $txStore;
   $: loading = !$transactionsLoaded;
   let error: string | null = null;
+
+  // Swap history state
+  let activeTab: "transactions" | "swaps" = "transactions";
+  let swapRecords: SwapRecord[] = [];
+  let swapsLoading = false;
+
+  onMount(async () => {
+    // Load swap history
+    try {
+      swapsLoading = true;
+      swapRecords = await getSwapHistory();
+    } catch (err) {
+      console.error("Failed to load swap history:", err);
+    } finally {
+      swapsLoading = false;
+    }
+  });
 
   interface GroupedTransactions {
     label: string;
@@ -60,79 +80,109 @@
 <div class="history">
   <header class="history-header">
     <h1>Activity</h1>
-    {#if transactions.length > 0}
+    {#if activeTab === "transactions" && transactions.length > 0}
       <span class="tx-count">{transactions.length}</span>
+    {:else if activeTab === "swaps" && swapRecords.length > 0}
+      <span class="tx-count">{swapRecords.length}</span>
     {/if}
   </header>
 
-  <div class="history-content">
-    {#if loading}
-      <div class="loading-state">
-        <Loader2 size={22} class="spin" />
-        <p>Loading transactions</p>
-      </div>
-    {:else if error}
-      <div class="error-state">
-        <div class="error-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-        </div>
-        <p class="error-message">{error}</p>
-      </div>
-    {:else if transactions.length === 0 && $pendingTxList.length === 0}
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-        </div>
-        <h3>No transactions yet</h3>
-        <p>Your activity will appear here</p>
-      </div>
-    {:else}
-      <div class="transaction-groups">
-        <!-- Pending Transactions -->
-        {#if $pendingTxList.length > 0}
-          <div class="transaction-group pending-group">
-            <div class="group-header">
-              <span class="group-label">Processing</span>
-              <span class="group-count pending">{$pendingTxList.length}</span>
-            </div>
-            <div class="transaction-list pending">
-              {#each $pendingTxList as pendingTx (pendingTx.id)}
-                <PendingTransactionItem {pendingTx} />
-              {/each}
-            </div>
-          </div>
-        {/if}
+  <div class="tabs">
+    <button
+      class="tab"
+      class:active={activeTab === "transactions"}
+      onclick={() => activeTab = "transactions"}
+    >
+      Transactions
+    </button>
+    <button
+      class="tab"
+      class:active={activeTab === "swaps"}
+      onclick={() => activeTab = "swaps"}
+    >
+      Swaps
+    </button>
+  </div>
 
-        <!-- Confirmed Transactions -->
-        {#each groupedTransactions as group}
-          <div class="transaction-group">
-            <div class="group-header">
-              <span class="group-label">{group.label}</span>
-              <span class="group-count">{group.transactions.length}</span>
-            </div>
-            <div class="transaction-list">
-              {#each group.transactions as tx}
-                <TransactionItem
-                  txid={tx.txid}
-                  txType={tx.tx_type}
-                  amount={tx.amount}
-                  timestamp={tx.timestamp}
-                  address={tx.address}
-                  memo={tx.memo}
-                  status={tx.status}
-                  confirmations={tx.confirmations}
-                />
-              {/each}
-            </div>
+  <div class="history-content">
+    {#if activeTab === "transactions"}
+      {#if loading}
+        <div class="loading-state">
+          <Loader2 size={22} class="spin" />
+          <p>Loading transactions</p>
+        </div>
+      {:else if error}
+        <div class="error-state">
+          <div class="error-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
           </div>
-        {/each}
-      </div>
+          <p class="error-message">{error}</p>
+        </div>
+      {:else if transactions.length === 0 && $pendingTxList.length === 0}
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <h3>No transactions yet</h3>
+          <p>Your activity will appear here</p>
+        </div>
+      {:else}
+        <div class="transaction-groups">
+          <!-- Pending Transactions -->
+          {#if $pendingTxList.length > 0}
+            <div class="transaction-group pending-group">
+              <div class="group-header">
+                <span class="group-label">Processing</span>
+                <span class="group-count pending">{$pendingTxList.length}</span>
+              </div>
+              <div class="transaction-list pending">
+                {#each $pendingTxList as pendingTx (pendingTx.id)}
+                  <PendingTransactionItem {pendingTx} />
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Confirmed Transactions -->
+          {#each groupedTransactions as group}
+            <div class="transaction-group">
+              <div class="group-header">
+                <span class="group-label">{group.label}</span>
+                <span class="group-count">{group.transactions.length}</span>
+              </div>
+              <div class="transaction-list">
+                {#each group.transactions as tx}
+                  <TransactionItem
+                    txid={tx.txid}
+                    txType={tx.tx_type}
+                    amount={tx.amount}
+                    timestamp={tx.timestamp}
+                    address={tx.address}
+                    memo={tx.memo}
+                    status={tx.status}
+                    confirmations={tx.confirmations}
+                  />
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {:else if activeTab === "swaps"}
+      {#if swapsLoading}
+        <div class="loading-state">
+          <Loader2 size={22} class="spin" />
+          <p>Loading swaps</p>
+        </div>
+      {:else}
+        <SwapHistory swaps={swapRecords} />
+      {/if}
     {/if}
   </div>
 </div>
@@ -341,5 +391,37 @@
       rgba(255, 255, 255, 0.03) 0%,
       transparent 100%
     );
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: var(--space-2);
+    padding: 0 var(--space-5);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .tab {
+    flex: 1;
+    padding: var(--space-3) var(--space-4);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    position: relative;
+    bottom: -1px;
+  }
+
+  .tab:hover {
+    color: var(--text-secondary);
+  }
+
+  .tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
   }
 </style>
