@@ -606,4 +606,38 @@ impl IkkiWallet {
         // Try to decode as UTF-8
         String::from_utf8(memo_bytes[..end].to_vec()).ok()
     }
+
+    /// Derive a transparent address at the given index for swaps
+    ///
+    /// Uses BIP-44 external chain derivation from the wallet seed.
+    pub fn derive_transparent_address(&self, index: u32) -> anyhow::Result<String> {
+        use zcash_keys::keys::UnifiedSpendingKey;
+        use zcash_protocol::consensus::NetworkType;
+        use zcash_transparent::keys::{NonHardenedChildIndex, TransparentKeyScope};
+        use zcash_transparent::address::TransparentAddress;
+
+        // Derive the unified spending key from seed
+        let usk = UnifiedSpendingKey::from_seed(&TEST_NETWORK, &self.seed, AccountId::ZERO)
+            .map_err(|e| anyhow::anyhow!("Failed to derive spending key: {e:?}"))?;
+
+        // Get the transparent account key
+        let transparent_key = usk.transparent();
+
+        // Convert to account public key for address derivation
+        let account_pubkey = transparent_key.to_account_pubkey();
+
+        // Convert index to NonHardenedChildIndex
+        let child_index = NonHardenedChildIndex::from_index(index)
+            .ok_or_else(|| anyhow::anyhow!("Invalid child index: {}", index))?;
+
+        // Derive the public key at the external address path
+        let address_pubkey = account_pubkey
+            .derive_address_pubkey(TransparentKeyScope::EXTERNAL, child_index)
+            .map_err(|e| anyhow::anyhow!("Failed to derive transparent pubkey at index {}: {:?}", index, e))?;
+
+        // Convert public key to transparent address
+        let address = TransparentAddress::from_pubkey(&address_pubkey);
+
+        Ok(address.to_zcash_address(NetworkType::Test).to_string())
+    }
 }
