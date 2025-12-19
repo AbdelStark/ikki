@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { SwapAddress, SwapRecord } from '../types/swap';
 
 // Types matching Rust structs
 export interface BalanceInfo {
@@ -200,4 +201,42 @@ export function onSyncError(
   return listen<string>("sync-error", (event) => {
     callback(event.payload);
   });
+}
+
+// Swap commands
+export async function getSwapReceivingAddress(preferShielded: boolean): Promise<SwapAddress> {
+  return invoke<SwapAddress>('get_swap_receiving_address', { preferShielded });
+}
+
+export async function generateEphemeralAddress(): Promise<string> {
+  return invoke<string>('generate_ephemeral_address');
+}
+
+export async function saveSwap(swap: SwapRecord): Promise<void> {
+  return invoke<void>('save_swap', { swap });
+}
+
+export async function updateSwapStatus(
+  swapId: string,
+  status: string,
+  intentHash?: string,
+  txid?: string
+): Promise<void> {
+  return invoke<void>('update_swap_status', { swapId, status, intentHash, txid });
+}
+
+export async function getSwapHistory(): Promise<SwapRecord[]> {
+  return invoke<SwapRecord[]>('get_swap_history');
+}
+
+export async function getActiveSwaps(): Promise<SwapRecord[]> {
+  return invoke<SwapRecord[]>('get_active_swaps');
+}
+
+export async function checkTransparentBalance(address: string): Promise<number> {
+  return invoke<number>('check_transparent_balance', { address });
+}
+
+export async function shieldTransparentFunds(fromAddress: string): Promise<string> {
+  return invoke<string>('shield_transparent_funds', { fromAddress });
 }
