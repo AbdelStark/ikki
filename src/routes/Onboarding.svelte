@@ -2,12 +2,16 @@
   import { ArrowLeft, Plus, Import, Copy, Check, Loader2, Eye, EyeOff } from "lucide-svelte";
   import { wallet } from "../lib/stores/wallet";
   import { ui } from "../lib/stores/ui";
+  import { sync } from "../lib/stores/sync";
   import { generateSeed, initWallet, loadWallet } from "../lib/utils/tauri";
   import { copyToClipboard } from "../lib/utils/format";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
   type Step = "welcome" | "choice" | "create" | "import" | "confirm" | "loading" | "complete";
+
+  // Event dispatcher to signal sync should start
+  export let onWalletReady: (() => void) | undefined = undefined;
 
   let currentStep: Step = "welcome";
   let seedPhrase = "";
@@ -103,7 +107,13 @@
   }
 
   function handleComplete() {
-    ui.setOnboardingComplete();
+    // Signal that wallet is ready and initial sync should begin
+    if (onWalletReady) {
+      onWalletReady();
+    } else {
+      // Fallback: just complete onboarding
+      ui.setOnboardingComplete();
+    }
   }
 
   async function handleCopySeed() {

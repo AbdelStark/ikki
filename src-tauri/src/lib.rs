@@ -35,6 +35,10 @@ pub fn run() {
             commands::wallet::get_all_addresses,
             commands::wallet::sync_wallet,
             commands::wallet::generate_seed,
+            // Sync commands
+            commands::wallet::start_background_sync,
+            commands::wallet::get_sync_status,
+            commands::wallet::cancel_sync,
             // Transaction commands
             commands::transactions::send_transaction,
             commands::transactions::get_transactions,

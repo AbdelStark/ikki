@@ -4,7 +4,9 @@ use crate::state::AppState;
 use crate::wallet::{IkkiWallet, ZcashConfig};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
-use tauri::State;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, State};
+use tracing::info;
 
 /// Wallet information returned to frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,7 +362,7 @@ pub async fn get_all_addresses(state: State<'_, AppState>) -> Result<Vec<String>
         .map_err(|e| format!("Failed to get addresses: {e}"))
 }
 
-/// Sync wallet with blockchain
+/// Sync wallet with blockchain (blocking - kept for compatibility)
 #[tauri::command]
 pub async fn sync_wallet(state: State<'_, AppState>) -> Result<SyncResult, String> {
     let mut wallet_lock = state.wallet.lock().await;
@@ -381,6 +383,176 @@ pub async fn sync_wallet(state: State<'_, AppState>) -> Result<SyncResult, Strin
 
     Ok(SyncResult {
         block_height,
+        balance: BalanceInfo {
+            total: breakdown.sapling + breakdown.orchard + breakdown.transparent,
+            shielded: breakdown.sapling + breakdown.orchard,
+            transparent: breakdown.transparent,
+        },
+    })
+}
+
+/// Sync progress event payload
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncProgress {
+    pub current_block: u64,
+    pub target_block: u64,
+    pub percentage: f64,
+    pub is_first_sync: bool,
+    pub status: String,
+}
+
+/// Sync status response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncStatus {
+    pub is_syncing: bool,
+    pub is_first_sync: bool,
+    pub current_block: u64,
+    pub target_block: u64,
+    pub percentage: f64,
+}
+
+/// Get current sync status
+#[tauri::command]
+pub async fn get_sync_status(state: State<'_, AppState>) -> Result<SyncStatus, String> {
+    let sync_state = &state.sync_state;
+    let (current, target) = sync_state.get_progress();
+    let percentage = if target > 0 {
+        (current as f64 / target as f64 * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+
+    Ok(SyncStatus {
+        is_syncing: sync_state.is_syncing(),
+        is_first_sync: sync_state.is_first_sync.load(std::sync::atomic::Ordering::SeqCst),
+        current_block: current,
+        target_block: target,
+        percentage,
+    })
+}
+
+/// Start background sync
+#[tauri::command]
+pub async fn start_background_sync(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    is_first_sync: bool,
+) -> Result<(), String> {
+    // Check if already syncing
+    if state.sync_state.is_syncing() {
+        return Err("Sync already in progress".to_string());
+    }
+
+    // Mark sync as started
+    state.sync_state.start_sync(is_first_sync);
+
+    // Clone what we need for the spawned task
+    let wallet = state.wallet.clone();
+    let sync_state = state.sync_state.clone();
+    let app_handle = app.clone();
+
+    // Spawn the sync task
+    tokio::spawn(async move {
+        info!("Sync task started");
+        let result = run_background_sync(wallet, sync_state.clone(), app_handle.clone()).await;
+
+        // End sync and emit completion event
+        sync_state.end_sync();
+        info!("Sync state ended, emitting completion event...");
+
+        match result {
+            Ok(sync_result) => {
+                info!("Sync successful, emitting sync-complete event");
+                let emit_result = app_handle.emit("sync-complete", &sync_result);
+                info!("sync-complete emit result: {:?}", emit_result);
+            }
+            Err(e) => {
+                info!("Sync failed with error: {}", e);
+                let emit_result = app_handle.emit("sync-error", &e);
+                info!("sync-error emit result: {:?}", emit_result);
+            }
+        }
+        info!("Sync task finished");
+    });
+
+    Ok(())
+}
+
+/// Cancel ongoing sync
+#[tauri::command]
+pub async fn cancel_sync(state: State<'_, AppState>) -> Result<(), String> {
+    state.sync_state.request_cancel();
+    Ok(())
+}
+
+/// Run the background sync with progress updates
+async fn run_background_sync(
+    wallet: Arc<tokio::sync::Mutex<Option<IkkiWallet>>>,
+    sync_state: Arc<crate::state::SyncState>,
+    app: AppHandle,
+) -> Result<SyncResult, String> {
+    info!("Background sync: acquiring wallet lock...");
+    let mut wallet_lock = wallet.lock().await;
+    let wallet_ref = wallet_lock.as_mut().ok_or("Wallet not initialized")?;
+    info!("Background sync: wallet lock acquired");
+
+    // Get target block height first
+    let target_height = wallet_ref
+        .get_block_height()
+        .await
+        .map_err(|e| format!("Failed to get block height: {e}"))?;
+    info!("Background sync: target height is {}", target_height);
+
+    // Emit initial progress
+    let is_first = sync_state.is_first_sync.load(std::sync::atomic::Ordering::SeqCst);
+    sync_state.update_progress(0, target_height);
+    let _ = app.emit(
+        "sync-progress",
+        SyncProgress {
+            current_block: 0,
+            target_block: target_height,
+            percentage: 0.0,
+            is_first_sync: is_first,
+            status: "Starting sync...".to_string(),
+        },
+    );
+
+    // Run sync
+    info!("Background sync: starting sync to block {}", target_height);
+    wallet_ref
+        .sync()
+        .await
+        .map_err(|e| format!("Sync failed: {e}"))?;
+    info!("Background sync: sync completed!");
+
+    // Get final state
+    info!("Background sync: getting final balance...");
+    let breakdown = wallet_ref
+        .get_balance_breakdown()
+        .map_err(|e| format!("Failed to get balance: {e}"))?;
+    let final_height = wallet_ref
+        .get_block_height()
+        .await
+        .map_err(|e| format!("Failed to get block height: {e}"))?;
+    info!("Background sync: final height is {}, balance updated", final_height);
+
+    // Emit 100% progress
+    sync_state.update_progress(final_height, final_height);
+    info!("Background sync: emitting sync-progress 100%");
+    let _ = app.emit(
+        "sync-progress",
+        SyncProgress {
+            current_block: final_height,
+            target_block: final_height,
+            percentage: 100.0,
+            is_first_sync: is_first,
+            status: "Sync complete".to_string(),
+        },
+    );
+
+    info!("Background sync: returning result");
+    Ok(SyncResult {
+        block_height: final_height,
         balance: BalanceInfo {
             total: breakdown.sapling + breakdown.orchard + breakdown.transparent,
             shielded: breakdown.sapling + breakdown.orchard,

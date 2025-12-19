@@ -1,8 +1,15 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { ui, currentView, needsOnboarding, toasts } from "./lib/stores/ui";
   import { wallet } from "./lib/stores/wallet";
-  import { checkWalletExists, autoLoadWallet } from "./lib/utils/tauri";
+  import { sync, isInitialSyncComplete, isSyncing as isSyncingStore, isFirstSync } from "./lib/stores/sync";
+  import {
+    checkWalletExists,
+    autoLoadWallet,
+    startBackgroundSync,
+    getSyncStatus,
+    getBalance,
+  } from "./lib/utils/tauri";
 
   // Views
   import Home from "./routes/Home.svelte";
@@ -17,8 +24,85 @@
   // Components
   import BottomNav from "./lib/components/BottomNav.svelte";
   import Toast from "./lib/components/Toast.svelte";
+  import InitialSync from "./lib/components/InitialSync.svelte";
+  import SyncIndicator from "./lib/components/SyncIndicator.svelte";
 
   let loading = true;
+  let showInitialSync = false;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Handle wallet ready from onboarding - trigger initial sync
+  async function handleWalletReady() {
+    showInitialSync = true;
+    ui.setNeedsOnboarding(false);
+
+    // Start the initial sync
+    try {
+      sync.startSync(true);
+      await startBackgroundSync(true);
+      // Start polling for completion
+      startPolling(true);
+    } catch (e) {
+      console.error("Failed to start initial sync:", e);
+      sync.setError(String(e));
+      ui.showToast(`Failed to start sync: ${e}`, "error");
+    }
+  }
+
+  // Poll for sync status and completion
+  function startPolling(isInitial: boolean) {
+    if (pollInterval) clearInterval(pollInterval);
+
+    pollInterval = setInterval(async () => {
+      try {
+        const status = await getSyncStatus();
+
+        // Update progress
+        if (status.is_syncing) {
+          sync.updateProgress({
+            currentBlock: status.current_block,
+            targetBlock: status.target_block,
+            percentage: status.percentage,
+            isFirstSync: status.is_first_sync,
+            status: status.percentage > 0 ? "Syncing..." : "Connecting to network...",
+          });
+        } else {
+          // Sync completed - fetch balance and complete
+          stopPolling();
+
+          try {
+            const balance = await getBalance();
+            wallet.updateBalance(balance);
+          } catch (e) {
+            console.error("Failed to fetch balance after sync:", e);
+          }
+
+          sync.completeSync();
+
+          if (isInitial) {
+            // Wait a moment to show 100% then dismiss
+            setTimeout(() => {
+              showInitialSync = false;
+            }, 1500);
+          } else {
+            ui.showToast("Wallet synced successfully", "success");
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll sync status:", e);
+      }
+    }, 500);
+
+    // Safety timeout - stop polling after 5 minutes
+    setTimeout(() => stopPolling(), 300000);
+  }
+
+  function stopPolling() {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  }
 
   onMount(async () => {
     try {
@@ -37,6 +121,8 @@
             blockHeight: walletInfo.block_height,
           });
           ui.setNeedsOnboarding(false);
+          // Mark initial sync as complete for existing wallets
+          sync.setInitialSyncComplete(true);
         } else {
           // Config exists but couldn't load - show onboarding
           ui.setNeedsOnboarding(true);
@@ -51,6 +137,13 @@
       loading = false;
     }
   });
+
+  onDestroy(() => {
+    stopPolling();
+  });
+
+  // Show sync indicator when background syncing (not first sync)
+  $: showSyncIndicator = $isSyncingStore && !$isFirstSync && !showInitialSync;
 </script>
 
 <main class="app">
@@ -62,7 +155,9 @@
       <div class="loading-spinner"></div>
     </div>
   {:else if $needsOnboarding}
-    <Onboarding />
+    <Onboarding onWalletReady={handleWalletReady} />
+  {:else if showInitialSync}
+    <InitialSync />
   {:else}
     <div class="app-content">
       {#if $currentView === "home"}
@@ -82,6 +177,13 @@
       {/if}
     </div>
     <BottomNav />
+
+    <!-- Background Sync Indicator -->
+    {#if showSyncIndicator}
+      <div class="sync-indicator-container">
+        <SyncIndicator />
+      </div>
+    {/if}
   {/if}
 
   <!-- Toasts -->
@@ -156,5 +258,16 @@
 
   .toast-container > :global(*) {
     pointer-events: auto;
+  }
+
+  .sync-indicator-container {
+    position: fixed;
+    top: var(--space-4);
+    left: var(--space-4);
+    right: var(--space-4);
+    max-width: var(--max-width);
+    margin: 0 auto;
+    z-index: 100;
+    animation: fadeInDown var(--duration-normal) var(--ease-out);
   }
 </style>

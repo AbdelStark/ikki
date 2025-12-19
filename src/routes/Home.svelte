@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { wallet, balance, address, isSyncing } from "../lib/stores/wallet";
+  import { wallet, balance, address } from "../lib/stores/wallet";
+  import { sync, isSyncing } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
-  import { syncWallet, getTransactions, type Transaction } from "../lib/utils/tauri";
+  import { startBackgroundSync, getTransactions, type Transaction } from "../lib/utils/tauri";
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
@@ -20,19 +21,11 @@
     }
   });
 
-  async function handleSync() {
-    try {
-      wallet.setSyncing(true);
-      const result = await syncWallet();
-      wallet.updateBalance(result.balance);
-      // Refresh transactions after sync
-      recentTransactions = await getTransactions();
-      ui.showToast("Wallet synced", "success");
-    } catch (e) {
-      ui.showToast(`Sync failed: ${e}`, "error");
-    } finally {
-      wallet.setSyncing(false);
-    }
+  // Refresh transactions when sync completes
+  $: if (!$isSyncing && recentTransactions.length >= 0) {
+    getTransactions().then((txs) => {
+      recentTransactions = txs;
+    }).catch(console.error);
   }
 </script>
 
@@ -41,7 +34,7 @@
     <AccountCard
       balance={$balance}
       address={$address}
-      syncing={$isSyncing}
+      syncing={$isSyncing ?? false}
     />
 
     <div class="actions">

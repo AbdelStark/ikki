@@ -1,10 +1,12 @@
 <script lang="ts">
   import { RefreshCw, Eye, EyeOff, ExternalLink, Trash2, Loader2, ArrowLeft, Check, Users, ChevronRight } from "lucide-svelte";
-  import { wallet, isSyncing } from "../lib/stores/wallet";
+  import { wallet } from "../lib/stores/wallet";
+  import { sync, isSyncing, syncProgress } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
-  import { syncWallet, resetWallet, loadWallet } from "../lib/utils/tauri";
+  import { startBackgroundSync, resetWallet, loadWallet, getSyncStatus, getBalance } from "../lib/utils/tauri";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
+  import SyncIndicator from "../lib/components/SyncIndicator.svelte";
 
   let showSeed = false;
   let showResetFlow = false;
@@ -13,19 +15,73 @@
   let inputBirthday = "";
   let isResetting = false;
   let loadingMessage = "";
+  let syncPollInterval: ReturnType<typeof setInterval> | null = null;
 
   async function handleSync() {
+    if ($isSyncing) return;
+
     try {
-      wallet.setSyncing(true);
-      const result = await syncWallet();
-      wallet.updateBalance(result.balance);
-      ui.showToast("Wallet synced", "success");
+      sync.startSync(false);
+      await startBackgroundSync(false);
+      // Poll for completion
+      pollSyncStatus();
     } catch (e) {
-      ui.showToast(`Sync failed: ${e}`, "error");
-    } finally {
-      wallet.setSyncing(false);
+      sync.setError(String(e));
+      ui.showToast(`Failed to start sync: ${e}`, "error");
     }
   }
+
+  // Poll for sync status and completion
+  function pollSyncStatus() {
+    if (syncPollInterval) clearInterval(syncPollInterval);
+
+    syncPollInterval = setInterval(async () => {
+      try {
+        const status = await getSyncStatus();
+
+        if (status.is_syncing) {
+          // Update progress
+          sync.updateProgress({
+            currentBlock: status.current_block,
+            targetBlock: status.target_block,
+            percentage: status.percentage,
+            isFirstSync: status.is_first_sync,
+            status: status.percentage > 0 ? "Syncing..." : "Connecting...",
+          });
+        } else {
+          // Sync completed
+          if (syncPollInterval) clearInterval(syncPollInterval);
+          syncPollInterval = null;
+
+          // Fetch updated balance
+          try {
+            const balance = await getBalance();
+            wallet.updateBalance(balance);
+          } catch (e) {
+            console.error("Failed to fetch balance after sync:", e);
+          }
+
+          sync.completeSync();
+          ui.showToast("Wallet synced successfully", "success");
+        }
+      } catch (e) {
+        console.error("Failed to poll sync status:", e);
+        if (syncPollInterval) clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 500);
+
+    // Safety timeout - stop after 5 minutes
+    setTimeout(() => {
+      if (syncPollInterval) {
+        clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 300000);
+  }
+
+  $: progress = $syncProgress;
+  $: percentage = progress?.percentage ?? 0;
 
   function toggleSeed() {
     showSeed = !showSeed;
@@ -291,7 +347,7 @@
                 {#if $isSyncing}
                   <span class="sync-status syncing">
                     <RefreshCw size={12} class="spin" />
-                    Syncing
+                    Syncing...
                   </span>
                 {:else}
                   <span class="sync-status">Synced</span>
@@ -299,10 +355,18 @@
               </span>
             </div>
           </div>
+          {#if $isSyncing}
+            <div class="sync-progress-container indeterminate">
+              <div class="sync-progress-bar indeterminate"></div>
+            </div>
+          {/if}
           <div class="setting-divider"></div>
           <button class="setting-item clickable" onclick={handleSync} disabled={$isSyncing}>
             <div class="setting-info">
-              <span class="setting-label">Sync Now</span>
+              <span class="setting-label">{$isSyncing ? "Syncing in background..." : "Sync Now"}</span>
+              {#if !$isSyncing}
+                <span class="setting-description">Continue using the app while syncing</span>
+              {/if}
             </div>
             <RefreshCw size={16} class={$isSyncing ? "spin" : ""} />
           </button>
@@ -541,6 +605,42 @@
 
   .setting-item :global(.spin) {
     animation: spin 1s linear infinite;
+  }
+
+  .sync-progress-container {
+    height: 2px;
+    background: var(--border);
+    margin: 0 var(--space-4);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+
+  .sync-progress-container.indeterminate {
+    background: var(--border);
+  }
+
+  .sync-progress-bar {
+    height: 100%;
+    background: var(--text-primary);
+    border-radius: var(--radius-full);
+    transition: width 0.3s var(--ease-out);
+  }
+
+  .sync-progress-bar.indeterminate {
+    width: 30%;
+    animation: indeterminate 1.5s ease-in-out infinite;
+  }
+
+  @keyframes indeterminate {
+    0% {
+      transform: translateX(-100%);
+    }
+    50% {
+      transform: translateX(300%);
+    }
+    100% {
+      transform: translateX(-100%);
+    }
   }
 
   .seed-display {
