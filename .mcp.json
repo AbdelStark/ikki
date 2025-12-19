@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ikki-automation": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "run",
+        "/Users/zakimanian/ikki/tools/ikki-mcp/src/index.ts"
+      ],
+      "env": {}
+    }
+  }
+}
