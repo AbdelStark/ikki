@@ -17,10 +17,10 @@
 
 <p align="center">
   <a href="#why-ikki">Why Ikki</a> •
+  <a href="#screenshots">Screenshots</a> •
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#development">Development</a>
+  <a href="#architecture">Architecture</a>
 </p>
 
 ---
@@ -30,6 +30,19 @@
 Ikki combines the privacy guarantees of Zcash with the polish of a modern consumer app. Built with Tauri and Svelte, it delivers native performance with a beautiful dark interface designed for mobile-first interactions.
 
 > **Note:** Testnet only. Do not use with real funds.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/misc/ikki-shot-tx-main.png" width="280" alt="Dashboard"></td>
+    <td><img src="docs/misc/ikki-shot-receive.png" width="280" alt="Receive"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/misc/ikki-shot-tx-detail.png" width="280" alt="Transaction Detail"></td>
+    <td><img src="docs/misc/ikki-shot-settings.png" width="280" alt="Settings"></td>
+  </tr>
+</table>
 
 ## Features
 
