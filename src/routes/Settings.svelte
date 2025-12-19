@@ -13,6 +13,7 @@
   let resetStep: "confirm" | "import" | "loading" | "complete" = "confirm";
   let inputSeed = "";
   let inputBirthday = "";
+  let showImportSeed = false;
   let isResetting = false;
   let loadingMessage = "";
   let syncPollInterval: ReturnType<typeof setInterval> | null = null;
@@ -99,6 +100,7 @@
     resetStep = "confirm";
     inputSeed = "";
     inputBirthday = "";
+    showImportSeed = false;
   }
 
   function confirmReset() {
@@ -171,6 +173,7 @@
     resetStep = "confirm";
     inputSeed = "";
     inputBirthday = "";
+    showImportSeed = false;
   }
 
   $: wordCount = inputSeed.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -222,9 +225,25 @@
 
           <div class="import-form">
             <div class="seed-input-container">
-              <label class="input-label">Recovery Phrase</label>
+              <div class="seed-input-header">
+                <label class="input-label" for="reset-import-seed">Recovery Phrase</label>
+                <button
+                  class="visibility-toggle"
+                  onclick={() => (showImportSeed = !showImportSeed)}
+                  type="button"
+                  aria-label={showImportSeed ? "Hide seed phrase" : "Show seed phrase"}
+                >
+                  {#if showImportSeed}
+                    <EyeOff size={16} />
+                  {:else}
+                    <Eye size={16} />
+                  {/if}
+                </button>
+              </div>
               <textarea
+                id="reset-import-seed"
                 class="seed-input"
+                class:hidden-seed={!showImportSeed}
                 placeholder="Enter your 24 words separated by spaces..."
                 value={inputSeed}
                 oninput={handleSeedInput}
@@ -792,6 +811,37 @@
     gap: var(--space-6);
   }
 
+  .seed-input-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+  }
+
+  .seed-input-header .input-label {
+    margin-bottom: 0;
+  }
+
+  .seed-input-header .visibility-toggle {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+
+  .seed-input-header .visibility-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
   .input-label {
     display: block;
     font-size: var(--text-xs);
@@ -833,6 +883,13 @@
     outline: none;
     border-color: var(--border-focus);
     background: var(--bg-secondary);
+  }
+
+  .seed-input.hidden-seed {
+    -webkit-text-security: disc;
+    text-security: disc;
+    font-family: var(--font-sans);
+    letter-spacing: 2px;
   }
 
   .word-counter {
