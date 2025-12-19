@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { Home, Clock, Settings } from "lucide-svelte";
+  import { Home, Clock, Settings, ArrowLeftRight } from "lucide-svelte";
   import { ui, currentView } from "../stores/ui";
 
   const navItems = [
     { id: "home" as const, icon: Home, label: "Home" },
+    { id: "swap" as const, icon: ArrowLeftRight, label: "Swap" },
     { id: "history" as const, icon: Clock, label: "Activity" },
     { id: "settings" as const, icon: Settings, label: "Settings" },
   ];
