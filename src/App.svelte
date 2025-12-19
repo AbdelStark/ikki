@@ -11,6 +11,7 @@
     getSyncStatus,
     getBalance,
     getPendingTransactions,
+    dismissPendingTransaction,
   } from "./lib/utils/tauri";
 
   // Views
@@ -33,6 +34,8 @@
   let showInitialSync = false;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let pendingTxPollInterval: ReturnType<typeof setInterval> | null = null;
+  // Track which transactions we've already shown completion toasts for
+  let acknowledgedTxIds = new Set<string>();
 
   // Handle wallet ready from onboarding - trigger initial sync
   async function handleWalletReady() {
@@ -116,25 +119,36 @@
         const pending = await getPendingTransactions();
         pendingTransactions.setAll(pending);
 
-        // If a transaction just completed (broadcast or failed), refresh balance
-        const justCompleted = pending.filter(tx =>
-          tx.status === "broadcast" || tx.status === "failed"
-        );
+        // Handle completed transactions (broadcast or failed)
+        for (const tx of pending) {
+          if ((tx.status === "broadcast" || tx.status === "failed") && !acknowledgedTxIds.has(tx.id)) {
+            // Mark as acknowledged so we don't show toast again
+            acknowledgedTxIds.add(tx.id);
 
-        if (justCompleted.length > 0) {
-          // Refresh balance after transaction completes
-          try {
-            const balance = await getBalance();
-            wallet.updateBalance(balance);
-          } catch (e) {
-            console.error("Failed to refresh balance:", e);
-          }
-
-          // Show toast for completed transactions
-          for (const tx of justCompleted) {
-            if (tx.status === "broadcast" && tx.txid) {
+            // Show toast once
+            if (tx.status === "broadcast") {
               ui.showToast("Transaction broadcast successfully", "success");
+              // Refresh balance after successful broadcast
+              try {
+                const balance = await getBalance();
+                wallet.updateBalance(balance);
+              } catch (e) {
+                console.error("Failed to refresh balance:", e);
+              }
+            } else if (tx.status === "failed") {
+              ui.showToast(`Transaction failed: ${tx.error || "Unknown error"}`, "error");
             }
+
+            // Auto-remove completed transactions after 5 seconds
+            const txId = tx.id;
+            setTimeout(async () => {
+              try {
+                await dismissPendingTransaction(txId);
+                pendingTransactions.remove(txId);
+              } catch (e) {
+                console.error("Failed to dismiss transaction:", e);
+              }
+            }, 5000);
           }
         }
 

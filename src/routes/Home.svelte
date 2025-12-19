@@ -10,6 +10,7 @@
 
   let recentTransactions: Transaction[] = [];
   let loading = true;
+  let previousSyncing = false;
 
   onMount(async () => {
     try {
@@ -21,11 +22,16 @@
     }
   });
 
-  // Refresh transactions when sync completes
-  $: if (!$isSyncing && recentTransactions.length >= 0) {
-    getTransactions().then((txs) => {
-      recentTransactions = txs;
-    }).catch(console.error);
+  // Refresh transactions when sync completes (transition from syncing to not syncing)
+  $: {
+    const currentSyncing = $isSyncing;
+    if (previousSyncing && !currentSyncing) {
+      // Sync just completed, refresh transactions
+      getTransactions().then((txs) => {
+        recentTransactions = txs;
+      }).catch(console.error);
+    }
+    previousSyncing = currentSyncing;
   }
 </script>
 
