@@ -70,20 +70,24 @@ const mockSwapKit = {
 };
 
 // Real SwapKit implementation
-// NOTE: SwapKit SDK requires Node.js crypto polyfills for browser use.
-// When ready to use real SDK:
-// 1. Configure Vite with crypto polyfills (crypto-browserify, buffer, stream-browserify)
-// 2. Uncomment the import below
-// 3. Set VITE_USE_MOCK_SWAPKIT=false
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getRealSwapKitClient(): Promise<any> {
-  // TODO: Enable when Vite is configured with Node.js polyfills
-  // const { SwapKitApi } = await import('@swapkit/sdk');
-  // return new SwapKitApi({ /* config */ });
-  throw new Error(
-    'SwapKit SDK not configured. Set VITE_USE_MOCK_SWAPKIT=true or configure Vite polyfills.'
-  );
+let swapKitClient: any = null;
+
+async function getRealSwapKitClient() {
+  if (swapKitClient) return swapKitClient;
+
+  try {
+    const { SwapKit } = await import('@swapkit/sdk');
+    swapKitClient = new SwapKit({
+      config: {
+        thorswapApiKey: import.meta.env.VITE_THORSWAP_API_KEY || '',
+      },
+    });
+    return swapKitClient;
+  } catch (error) {
+    console.error('Failed to initialize SwapKit:', error);
+    throw new Error('SwapKit SDK initialization failed');
+  }
 }
 
 /**
