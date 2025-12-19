@@ -51,6 +51,7 @@ const mockSwapKit = {
         feePercent: 0.01,
         expiresAt: Date.now() + 60000,
         estimatedTime: 120,
+        raw: {},
       },
     ];
   },
@@ -215,13 +216,13 @@ export function detectChain(address: string): string | null {
   // Zcash transparent
   if (address.startsWith('t1') || address.startsWith('t3')) return 'zcash';
 
-  // Bitcoin
+  // Bitcoin (CHECK BEFORE SOLANA - legacy addresses start with 1 or 3)
   if (address.startsWith('bc1') || address.startsWith('1') || address.startsWith('3')) return 'bitcoin';
 
   // Ethereum / EVM
   if (address.startsWith('0x') && address.length === 42) return 'ethereum';
 
-  // Solana (base58, 32-44 chars)
+  // Solana (base58, 32-44 chars, AFTER Bitcoin and Zcash checks)
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return 'solana';
 
   // NEAR (account.near or implicit)
