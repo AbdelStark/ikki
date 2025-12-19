@@ -1,38 +1,16 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { wallet, balance, address } from "../lib/stores/wallet";
   import { sync, isSyncing } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
-  import { startBackgroundSync, getTransactions, type Transaction } from "../lib/utils/tauri";
+  import { transactions, transactionsLoaded } from "../lib/stores/transactions";
+  import { type Transaction } from "../lib/utils/tauri";
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
 
-  let recentTransactions: Transaction[] = [];
-  let loading = true;
-  let previousSyncing = false;
-
-  onMount(async () => {
-    try {
-      recentTransactions = await getTransactions();
-    } catch (e) {
-      console.error("Failed to load transactions:", e);
-    } finally {
-      loading = false;
-    }
-  });
-
-  // Refresh transactions when sync completes (transition from syncing to not syncing)
-  $: {
-    const currentSyncing = $isSyncing;
-    if (previousSyncing && !currentSyncing) {
-      // Sync just completed, refresh transactions
-      getTransactions().then((txs) => {
-        recentTransactions = txs;
-      }).catch(console.error);
-    }
-    previousSyncing = currentSyncing;
-  }
+  // Use global transactions store
+  $: recentTransactions = $transactions;
+  $: loading = !$transactionsLoaded;
 </script>
 
 <div class="home">

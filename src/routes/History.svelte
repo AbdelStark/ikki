@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { Loader2, Clock, Check, X } from "lucide-svelte";
-  import { getTransactions, type Transaction, type PendingTransaction } from "../lib/utils/tauri";
+  import { type Transaction, type PendingTransaction } from "../lib/utils/tauri";
   import { pendingTxList } from "../lib/stores/pendingTransactions";
+  import { transactions as txStore, transactionsLoading, transactionsLoaded } from "../lib/stores/transactions";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
   import PendingTransactionItem from "../lib/components/PendingTransactionItem.svelte";
 
-  let transactions: Transaction[] = [];
-  let loading = true;
+  // Use global transactions store
+  $: transactions = $txStore;
+  $: loading = !$transactionsLoaded;
   let error: string | null = null;
 
   interface GroupedTransactions {
@@ -54,16 +55,6 @@
   }
 
   $: groupedTransactions = groupTransactionsByDate(transactions);
-
-  onMount(async () => {
-    try {
-      transactions = await getTransactions();
-    } catch (e) {
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  });
 </script>
 
 <div class="history">

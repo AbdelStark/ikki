@@ -4,6 +4,7 @@
   import { wallet } from "./lib/stores/wallet";
   import { sync, isInitialSyncComplete, isSyncing as isSyncingStore, isFirstSync } from "./lib/stores/sync";
   import { pendingTransactions, hasActivePending } from "./lib/stores/pendingTransactions";
+  import { transactionsStore } from "./lib/stores/transactions";
   import {
     checkWalletExists,
     autoLoadWallet,
@@ -12,6 +13,7 @@
     getBalance,
     getPendingTransactions,
     dismissPendingTransaction,
+    getTransactions,
   } from "./lib/utils/tauri";
 
   // Views
@@ -36,6 +38,17 @@
   let pendingTxPollInterval: ReturnType<typeof setInterval> | null = null;
   // Track which transactions we've already shown completion toasts for
   let acknowledgedTxIds = new Set<string>();
+
+  // Load transactions into global store
+  async function refreshTransactions() {
+    try {
+      const txs = await getTransactions();
+      transactionsStore.setTransactions(txs);
+    } catch (e) {
+      console.error("Failed to load transactions:", e);
+      transactionsStore.setError(String(e));
+    }
+  }
 
   // Handle wallet ready from onboarding - trigger initial sync
   async function handleWalletReady() {
@@ -73,7 +86,7 @@
             status: status.percentage > 0 ? "Syncing..." : "Connecting to network...",
           });
         } else {
-          // Sync completed - fetch balance and complete
+          // Sync completed - fetch balance, transactions and complete
           stopPolling();
 
           try {
@@ -82,6 +95,9 @@
           } catch (e) {
             console.error("Failed to fetch balance after sync:", e);
           }
+
+          // Refresh transactions after sync
+          await refreshTransactions();
 
           sync.completeSync();
 
@@ -128,12 +144,13 @@
             // Show toast once
             if (tx.status === "broadcast") {
               ui.showToast("Transaction broadcast successfully", "success");
-              // Refresh balance after successful broadcast
+              // Refresh balance and transactions after successful broadcast
               try {
                 const balance = await getBalance();
                 wallet.updateBalance(balance);
+                await refreshTransactions();
               } catch (e) {
-                console.error("Failed to refresh balance:", e);
+                console.error("Failed to refresh after broadcast:", e);
               }
             } else if (tx.status === "failed") {
               ui.showToast(`Transaction failed: ${tx.error || "Unknown error"}`, "error");
@@ -191,6 +208,9 @@
           ui.setNeedsOnboarding(false);
           // Mark initial sync as complete for existing wallets
           sync.setInitialSyncComplete(true);
+
+          // Load transactions into global store
+          await refreshTransactions();
 
           // Load any pending transactions from backend
           try {
