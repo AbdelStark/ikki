@@ -149,6 +149,12 @@
                 const balance = await getBalance();
                 wallet.updateBalance(balance);
                 await refreshTransactions();
+
+                // Trigger a background sync to ensure wallet state is fully updated
+                // This helps catch the transaction confirmation and update final balance
+                sync.startSync(false);
+                await startBackgroundSync(false);
+                startPolling(false);
               } catch (e) {
                 console.error("Failed to refresh after broadcast:", e);
               }

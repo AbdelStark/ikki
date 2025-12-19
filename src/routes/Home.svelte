@@ -3,6 +3,7 @@
   import { sync, isSyncing } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
   import { transactions, transactionsLoaded } from "../lib/stores/transactions";
+  import { totalPendingAmount } from "../lib/stores/pendingTransactions";
   import { type Transaction } from "../lib/utils/tauri";
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
@@ -19,6 +20,7 @@
       balance={$balance}
       address={$address}
       syncing={$isSyncing ?? false}
+      pendingAmount={$totalPendingAmount}
     />
 
     <div class="actions">

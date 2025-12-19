@@ -82,3 +82,11 @@ export const hasActivePending = derived(
   activePendingCount,
   ($count) => $count > 0
 );
+
+// Derived store for total pending amount (sum of active transactions)
+// This is used for optimistic balance display
+export const totalPendingAmount = derived(pendingTransactions, ($state) =>
+  $state.transactions
+    .filter((tx) => tx.status === "building" || tx.status === "broadcasting")
+    .reduce((sum, tx) => sum + tx.amount, 0)
+);

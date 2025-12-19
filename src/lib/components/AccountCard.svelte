@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Copy, Check, RefreshCw, Shield, Shuffle } from "lucide-svelte";
+  import { Copy, Check, RefreshCw, Shield, Shuffle, ArrowUpRight } from "lucide-svelte";
   import { ui } from "../stores/ui";
   import { wallet } from "../stores/wallet";
   import { formatZec, truncateAddress, copyToClipboard } from "../utils/format";
@@ -8,6 +8,7 @@
   export let balance: number = 0;
   export let address: string = "";
   export let syncing: boolean = false;
+  export let pendingAmount: number = 0;
 
   let copied = false;
   let shuffling = false;
@@ -56,10 +57,18 @@
       {/if}
     </div>
 
-    <div class="balance">
-      <span class="balance-int">{intPart}</span>
-      <span class="balance-dec">.{decPart}</span>
-      <span class="balance-unit">ZEC</span>
+    <div class="balance-section">
+      <div class="balance">
+        <span class="balance-int">{intPart}</span>
+        <span class="balance-dec">.{decPart}</span>
+        <span class="balance-unit">ZEC</span>
+      </div>
+      {#if pendingAmount > 0}
+        <div class="pending-amount">
+          <ArrowUpRight size={12} strokeWidth={2} />
+          <span>-{formatZec(pendingAmount)} ZEC pending</span>
+        </div>
+      {/if}
     </div>
 
     <div class="address-row">
@@ -167,11 +176,33 @@
     animation: spin 1.2s linear infinite;
   }
 
+  .balance-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+  }
+
   .balance {
     display: flex;
     align-items: baseline;
     gap: 2px;
-    margin-bottom: var(--space-5);
+  }
+
+  .pending-amount {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    letter-spacing: var(--tracking-wide);
+    animation: fadeIn var(--duration-normal) var(--ease-out);
+  }
+
+  .pending-amount span {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
   .balance-int {
