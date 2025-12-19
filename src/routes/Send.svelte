@@ -7,6 +7,7 @@
   import { pendingTransactions } from "../lib/stores/pendingTransactions";
   import { sendTransactionBackground } from "../lib/utils/tauri";
   import { formatZec, parseZec, truncateAddress } from "../lib/utils/format";
+  import { detectChain, isZcashAddress } from "../lib/services/swapkit";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
@@ -94,6 +95,8 @@
 
   $: amountZatoshis = parseZec($sendAmount);
   $: totalWithFee = amountZatoshis + FEE;
+  $: detectedChain = $sendAddress ? detectChain($sendAddress) : null;
+  $: isCrossPay = detectedChain !== null && detectedChain !== 'zcash';
 </script>
 
 <div class="send">
@@ -148,6 +151,16 @@
               oninput={handleAddressInput}
             />
           </div>
+
+          {#if isCrossPay}
+            <div class="crosspay-notice">
+              <span class="chain-badge">{detectedChain?.toUpperCase()}</span>
+              <div class="crosspay-text">
+                <span>This is a {detectedChain} address.</span>
+                <span class="crosspay-coming-soon">CrossPay via NEAR Intents coming soon</span>
+              </div>
+            </div>
+          {/if}
 
           <Input
             label="Memo (optional)"
@@ -686,5 +699,47 @@
     color: var(--text-secondary);
     font-size: var(--text-xs);
     max-width: 280px;
+  }
+
+  /* CrossPay Notice */
+  .crosspay-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--accent-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    animation: fadeIn var(--duration-fast) var(--ease-out);
+  }
+
+  .chain-badge {
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-semibold);
+    font-size: var(--text-2xs);
+    color: var(--text-primary);
+    letter-spacing: var(--tracking-wider);
+    white-space: nowrap;
+  }
+
+  .crosspay-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+  }
+
+  .crosspay-text > span:first-child {
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+  }
+
+  .crosspay-coming-soon {
+    color: var(--text-tertiary);
+    font-size: var(--text-2xs);
+    font-style: italic;
   }
 </style>
