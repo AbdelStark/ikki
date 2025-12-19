@@ -4,6 +4,7 @@
 
 mod commands;
 mod state;
+pub mod swap;
 pub mod wallet;
 
 use state::AppState;
