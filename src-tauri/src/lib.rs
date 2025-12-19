@@ -47,6 +47,15 @@ pub fn run() {
             commands::transactions::get_pending_transactions,
             commands::transactions::get_pending_transaction,
             commands::transactions::dismiss_pending_transaction,
+            // Swap commands
+            commands::swap::get_swap_receiving_address,
+            commands::swap::generate_ephemeral_address,
+            commands::swap::save_swap,
+            commands::swap::update_swap_status,
+            commands::swap::get_swap_history,
+            commands::swap::get_active_swaps,
+            commands::swap::check_transparent_balance,
+            commands::swap::shield_transparent_funds,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
