@@ -1,284 +1,219 @@
 <h1 align="center">
   <br>
-  <img src="public/ikki-logo.png" alt="Ikki" width="120">
+  <img src="public/ikki-logo.png" alt="Ikki" width="128">
   <br>
   Ikki
   <br>
 </h1>
 
-<h4 align="center">A beautiful, privacy-first Zcash wallet for everyone.</h4>
+<h4 align="center">A privacy-first Zcash wallet with a premium mobile experience.</h4>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#development">Development</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#security">Security</a> •
-  <a href="#license">License</a>
+  <a href="https://github.com/AbdelStark/ikki/releases"><img src="https://img.shields.io/github/v/release/AbdelStark/ikki?style=flat-square&color=8b5cf6" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/network-testnet-f59e0b?style=flat-square" alt="Testnet">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Zcash-Testnet-yellow?style=flat-square" alt="Zcash Testnet">
-  <img src="https://img.shields.io/badge/Tauri-2.0-blue?style=flat-square" alt="Tauri 2.0">
-  <img src="https://img.shields.io/badge/Svelte-5-orange?style=flat-square" alt="Svelte 5">
-  <img src="https://img.shields.io/badge/Rust-1.81+-brown?style=flat-square" alt="Rust 1.81+">
+  <a href="#why-ikki">Why Ikki</a> •
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#development">Development</a>
 </p>
 
 ---
 
-## Overview
+## Why Ikki
 
-Ikki is a modern, cross-platform Zcash wallet built with privacy and user experience at its core. It combines a beautiful Svelte-based UI with a powerful Rust backend powered by the official Zcash libraries.
+Ikki combines the privacy guarantees of Zcash with the polish of a modern consumer app. Built with Tauri and Svelte, it delivers native performance with a beautiful dark interface designed for mobile-first interactions.
 
-**Current Status:** Testnet only. Do not use with real funds.
+> **Note:** Testnet only. Do not use with real funds.
 
 ## Features
 
-### Core Wallet
+**Wallet**
+- HD wallet with BIP-39 24-word seed phrases
+- Unified addresses (Orchard + Sapling shielded pools)
+- Diversified addresses for unlinkable payments
+- Fast sync via lightwalletd compact blocks
 
-- **HD Wallet** - BIP-39 compatible 24-word seed phrases
-- **Unified Addresses** - Full support for Orchard and Sapling shielded pools
-- **Diversified Addresses** - Generate unlimited unlinkable addresses
-- **Fast Sync** - Compact block scanning via lightwalletd
+**Privacy**
+- Shielded by default — all transactions use Orchard/Sapling
+- 512-byte encrypted memo support
+- Zero analytics or telemetry
 
-### User Experience
+**Experience**
+- Premium dark theme with careful attention to detail
+- QR code scanning and generation
+- Real-time background sync with progress indication
+- Transaction history grouped by date
+- Optimistic balance updates for pending transactions
 
-- **Premium Dark Theme** - Carefully crafted monochrome design
-- **QR Code Support** - Scan and share addresses easily
-- **Transaction History** - Grouped by date with detailed views
-- **Real-time Sync** - Background blockchain synchronization
-
-### Privacy
-
-- **Shielded by Default** - All transactions use Orchard/Sapling pools
-- **Encrypted Memos** - 512-byte encrypted memo field support
-- **No Tracking** - Zero analytics or telemetry
-
-## Installation
+## Quick Start
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://rustup.rs/) 1.81+
-- [Tauri CLI](https://v2.tauri.app/start/prerequisites/)
+- [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
 
-### Quick Start
+### Run
 
 ```bash
-# Clone the repository
 git clone https://github.com/AbdelStark/ikki.git
 cd ikki
-
-# Install frontend dependencies
 npm install
-
-# Run in development mode
 npm run tauri dev
 ```
 
-### Building for Production
+### Build
 
 ```bash
-# Build the application
 npm run tauri build
 ```
 
-The built application will be in `src-tauri/target/release/`.
-
-## Development
-
-### Project Structure
-
-```
-ikki/
-├── src/                    # Svelte frontend
-│   ├── lib/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── stores/         # Svelte stores (state management)
-│   │   └── utils/          # Utilities and Tauri bridge
-│   └── routes/             # Page components
-├── src-tauri/              # Rust backend
-│   └── src/
-│       ├── commands/       # Tauri IPC commands
-│       ├── wallet/         # Core wallet implementation
-│       └── state.rs        # Application state
-├── public/                 # Static assets
-└── package.json
-```
-
-### Frontend (Svelte 5)
-
-The frontend is built with:
-- **Svelte 5** - Reactive UI framework
-- **TypeScript** - Type-safe JavaScript
-- **Vite** - Fast build tool
-- **Lucide** - Beautiful icons
-
-Key components:
-- `Home.svelte` - Main dashboard with balance and recent activity
-- `Send.svelte` - Send ZEC with amount and address validation
-- `Receive.svelte` - QR code display and address management
-- `History.svelte` - Transaction history with date grouping
-- `TransactionDetail.svelte` - Detailed transaction view
-
-### Backend (Rust + Tauri)
-
-The backend is powered by:
-- **Tauri 2** - Native app framework
-- **zcash_client_backend** - Official Zcash wallet library
-- **zcash_client_sqlite** - SQLite-based wallet storage
-- **zcash_proofs** - Zero-knowledge proof generation
-
-Key modules:
-- `wallet/core.rs` - Wallet initialization, sync, and transactions
-- `wallet/config.rs` - Configuration management
-- `commands/wallet.rs` - Tauri commands for wallet operations
-- `commands/transactions.rs` - Transaction management
-
-### Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Build frontend for production |
-| `npm run tauri dev` | Run Tauri in development mode |
-| `npm run tauri build` | Build production app |
+Output: `src-tauri/target/release/`
 
 ## Architecture
 
-### State Management
-
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Svelte Frontend                          │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────┐ │
-│  │ wallet  │  │   ui    │  │  send   │  │  transaction    │ │
-│  │  store  │  │  store  │  │  store  │  │     store       │ │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └────────┬────────┘ │
-└───────┼────────────┼────────────┼────────────────┼──────────┘
-        │            │            │                │
-        └────────────┴────────────┴────────────────┘
+│                     Svelte Frontend                         │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────────────┐  │
+│  │ wallet  │  │   ui    │  │  send   │  │  transaction  │  │
+│  │  store  │  │  store  │  │  store  │  │     store     │  │
+│  └────┬────┘  └────┬────┘  └────┬────┘  └───────┬───────┘  │
+└───────┼────────────┼────────────┼───────────────┼──────────┘
+        └────────────┴────────────┴───────────────┘
                               │
                     Tauri IPC Bridge
                               │
 ┌─────────────────────────────┴───────────────────────────────┐
-│                      Rust Backend                            │
-│  ┌──────────────────┐     ┌─────────────────────────────┐   │
-│  │    AppState      │────▶│        IkkiWallet           │   │
-│  │  (Tauri State)   │     │  ┌─────────────────────┐    │   │
-│  └──────────────────┘     │  │   zcash_client_*    │    │   │
-│                           │  └──────────┬──────────┘    │   │
-│                           └─────────────┼───────────────┘   │
+│                      Rust Backend                           │
+│  ┌──────────────────┐     ┌─────────────────────────────┐  │
+│  │    AppState      │────▶│        IkkiWallet           │  │
+│  │  (Tauri State)   │     │  ┌─────────────────────┐    │  │
+│  └──────────────────┘     │  │   zcash_client_*    │    │  │
+│                           │  └──────────┬──────────┘    │  │
+│                           └─────────────┼───────────────┘  │
 └─────────────────────────────────────────┼───────────────────┘
                                           │
                                lightwalletd (gRPC)
                                           │
                                ┌──────────┴──────────┐
-                               │   Zcash Network     │
-                               │     (Testnet)       │
+                               │   Zcash Testnet     │
                                └─────────────────────┘
 ```
 
-### Data Flow
+### Stack
 
-1. **User Action** → Svelte component triggers store update
-2. **Store** → Calls Tauri command via `invoke()`
-3. **Tauri IPC** → Deserializes and routes to Rust handler
-4. **Command** → Acquires wallet lock, performs operation
-5. **Wallet** → Uses zcash_client_* for blockchain operations
-6. **Response** → Serialized and sent back to frontend
-7. **Store** → Updates state, triggers reactive UI update
+| Layer | Technology |
+|-------|------------|
+| Frontend | Svelte 5, TypeScript, Vite |
+| Backend | Rust, Tauri 2 |
+| Zcash | zcash_client_backend, zcash_client_sqlite, zcash_proofs |
+| Network | lightwalletd via gRPC/TLS |
 
-### Wallet Storage
+### Data Storage
 
 ```
 ~/.ikki/
-├── wallet.db              # SQLite database (zcash_client_sqlite)
-├── wallet_config.json     # Encrypted seed storage
-└── wallet.db-wal          # WAL journal (auto-managed)
+├── wallet.db              # SQLite (zcash_client_sqlite)
+├── wallet_config.json     # Seed storage
+└── wallet.db-wal          # WAL journal
 ```
+
+## Development
+
+### Structure
+
+```
+ikki/
+├── src/                    # Svelte frontend
+│   ├── lib/
+│   │   ├── components/     # UI components
+│   │   ├── stores/         # State management
+│   │   └── utils/          # Tauri bridge
+│   └── routes/             # Pages
+├── src-tauri/              # Rust backend
+│   └── src/
+│       ├── commands/       # IPC handlers
+│       ├── wallet/         # Core wallet
+│       └── state.rs        # App state
+└── public/                 # Static assets
+```
+
+### Commands
+
+```bash
+npm run dev          # Vite dev server
+npm run build        # Build frontend
+npm run tauri dev    # Development mode
+npm run tauri build  # Production build
+```
+
+### Key Files
+
+| Frontend | Purpose |
+|----------|---------|
+| `Home.svelte` | Dashboard with balance |
+| `Send.svelte` | Transaction creation |
+| `Receive.svelte` | QR code + addresses |
+| `History.svelte` | Transaction list |
+
+| Backend | Purpose |
+|---------|---------|
+| `wallet/core.rs` | Wallet operations |
+| `commands/wallet.rs` | Wallet IPC handlers |
+| `commands/transactions.rs` | Transaction handlers |
 
 ## Security
 
-### Seed Phrase Storage
+**Current implementation:**
+- Seed stored locally in `~/.ikki/wallet_config.json`
+- File permissions `0600` (Unix)
+- TLS for all lightwalletd connections
 
-- Stored locally in `~/.ikki/wallet_config.json`
-- Unix file permissions set to `0600` (owner read/write only)
-- **Warning:** This is a development setup. Production should use OS keychain.
+**Best practices:**
+1. Back up your seed phrase offline
+2. Use testnet only
+3. Verify addresses before sending
 
-### Network Security
-
-- All lightwalletd connections use TLS
-- Certificate validation via system root CAs
-
-### Best Practices
-
-1. **Backup your seed phrase** - Write it down and store securely
-2. **Use testnet only** - Do not use with real funds
-3. **Verify addresses** - Always double-check before sending
-4. **Keep software updated** - Security patches are important
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RUST_LOG` | `info` | Logging level (trace, debug, info, warn, error) |
-
-### Lightwalletd Server
-
-Currently connects to `testnet.zec.rocks:443`. To use a different server, modify `wallet/config.rs`.
-
-## Troubleshooting
-
-### Common Issues
-
-**Sync takes too long**
-- Initial sync may take several minutes
-- Set an appropriate birthday height when importing
-
-**Transaction pending for too long**
-- Zcash blocks are mined ~every 75 seconds
-- Wait for at least 10 confirmations
-
-**"Insufficient shielded funds" error**
-- Ensure funds are in Orchard/Sapling pools
-- Transparent funds need to be shielded first
-
-### Reset Wallet
-
-To completely reset the wallet:
-
+**Reset wallet:**
 ```bash
 rm -rf ~/.ikki/
 ```
 
-Then restart the application and create/import a new wallet.
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RUST_LOG` | `info` | Log level |
+
+Server: `testnet.zec.rocks:443` (configurable in `wallet/config.rs`)
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork the repo
+2. Create a branch (`git checkout -b feature/xyz`)
+3. Commit changes
+4. Push and open a PR
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- [Zcash Foundation](https://www.zfnd.org/) - For the zcash-client libraries
-- [Electric Coin Company](https://electriccoin.co/) - For Zcash development
-- [Tauri](https://tauri.app/) - For the amazing app framework
-- [Svelte](https://svelte.dev/) - For the reactive UI framework
+- [Zcash Foundation](https://www.zfnd.org/) — zcash-client libraries
+- [Electric Coin Company](https://electriccoin.co/) — Zcash protocol
+- [Tauri](https://tauri.app/) — native app framework
+- [Svelte](https://svelte.dev/) — reactive UI
 
 ---
 
 <p align="center">
-  Made with ❤️ for privacy
+  <sub>Built for privacy.</sub>
 </p>
