@@ -35,7 +35,7 @@ pub fn run() {
         wallet: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
         sync_state: std::sync::Arc::new(state::SyncState::new()),
         pending_tx_state: std::sync::Arc::new(state::PendingTxState::new()),
-        swap_db: std::sync::Arc::new(tokio::sync::Mutex::new(swap_db)),
+        swap_db: std::sync::Arc::new(std::sync::Mutex::new(swap_db)),
     };
 
     tauri::Builder::default()
