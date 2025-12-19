@@ -206,3 +206,35 @@ pub fn get_active_swaps(conn: &Connection) -> Result<Vec<SwapRecord>, rusqlite::
 
     Ok(swaps)
 }
+
+/// Get the next available derivation index for ephemeral addresses
+pub fn get_next_ephemeral_index(conn: &Connection) -> Result<u32, rusqlite::Error> {
+    let max_index: Option<u32> = conn.query_row(
+        "SELECT MAX(derivation_index) FROM ephemeral_addresses",
+        [],
+        |row| row.get(0),
+    ).ok().flatten();
+
+    Ok(max_index.map(|i| i + 1).unwrap_or(0))
+}
+
+/// Save an ephemeral address
+pub fn save_ephemeral_address(
+    conn: &Connection,
+    address: &str,
+    derivation_index: u32,
+    swap_id: Option<&str>,
+) -> Result<(), rusqlite::Error> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    conn.execute(
+        "INSERT INTO ephemeral_addresses (address, derivation_index, swap_id, created_at)
+         VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![address, derivation_index, swap_id, now],
+    )?;
+
+    Ok(())
+}

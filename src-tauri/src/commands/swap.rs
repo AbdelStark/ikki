@@ -10,11 +10,10 @@ pub async fn get_swap_receiving_address(
     state: State<'_, AppState>,
     prefer_shielded: bool,
 ) -> Result<SwapAddress, String> {
-    let wallet_guard = state.wallet.lock().await;
-    let wallet = wallet_guard.as_ref().ok_or("Wallet not loaded")?;
-
     if prefer_shielded {
-        // Try to get shielded address
+        // Return shielded (unified) address
+        let wallet_guard = state.wallet.lock().await;
+        let wallet = wallet_guard.as_ref().ok_or("Wallet not loaded")?;
         let address = wallet.get_address().map_err(|e| e.to_string())?;
         Ok(SwapAddress {
             address,
@@ -22,19 +21,70 @@ pub async fn get_swap_receiving_address(
             index: 0,
         })
     } else {
-        // Generate ephemeral transparent
-        // TODO: Implement proper transparent address derivation
-        Err("Transparent address generation not yet implemented".to_string())
+        // Generate transparent address using generate_ephemeral_address logic
+        // Get next index from database
+        let index = {
+            let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+            let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+            crate::swap::db::get_next_ephemeral_index(conn)
+                .map_err(|e| format!("Failed to get ephemeral index: {}", e))?
+        };
+
+        // Derive address from wallet
+        let address = {
+            let wallet_guard = state.wallet.lock().await;
+            let wallet = wallet_guard.as_ref().ok_or("Wallet not loaded")?;
+            wallet.derive_transparent_address(index)
+                .map_err(|e| format!("Failed to derive transparent address: {}", e))?
+        };
+
+        // Save to database
+        {
+            let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+            let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+            crate::swap::db::save_ephemeral_address(conn, &address, index, None)
+                .map_err(|e| format!("Failed to save ephemeral address: {}", e))?;
+        }
+
+        Ok(SwapAddress {
+            address,
+            address_type: AddressType::Transparent,
+            index,
+        })
     }
 }
 
 /// Generate an ephemeral transparent address for CrossPay
 #[tauri::command]
 pub async fn generate_ephemeral_address(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
-    // TODO: Implement proper transparent address derivation from seed
-    Err("Ephemeral address generation not yet implemented".to_string())
+    // Get next available index from database
+    let index = {
+        let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+        crate::swap::db::get_next_ephemeral_index(conn)
+            .map_err(|e| format!("Failed to get ephemeral index: {}", e))?
+    };
+
+    // Derive transparent address from wallet
+    let address = {
+        let wallet_guard = state.wallet.lock().await;
+        let wallet = wallet_guard.as_ref().ok_or("Wallet not loaded")?;
+        wallet.derive_transparent_address(index)
+            .map_err(|e| format!("Failed to derive transparent address: {}", e))?
+    };
+
+    // Save address to database
+    {
+        let db_guard = state.swap_db.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let conn = db_guard.as_ref().ok_or("Swap database not initialized")?;
+        crate::swap::db::save_ephemeral_address(conn, &address, index, None)
+            .map_err(|e| format!("Failed to save ephemeral address: {}", e))?;
+    }
+
+    tracing::info!("Generated ephemeral address {} at index {}", address, index);
+    Ok(address)
 }
 
 /// Save a swap record
