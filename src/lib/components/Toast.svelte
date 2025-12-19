@@ -15,8 +15,10 @@
 </script>
 
 <div class="toast toast-{toast.type}" role="alert">
-  <div class="toast-icon">
-    <Icon size={16} strokeWidth={2} />
+  <div class="toast-icon-wrap">
+    <div class="toast-icon">
+      <Icon size={16} strokeWidth={2.5} />
+    </div>
   </div>
   <span class="toast-message">{toast.message}</span>
   <button class="toast-dismiss" onclick={() => ui.dismissToast(toast.id)} aria-label="Dismiss">
@@ -35,28 +37,86 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     animation: fadeInUp var(--duration-normal) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Premium gradient overlay */
+  .toast::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+  }
+
+  /* Top shine */
+  .toast::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+  }
+
+  .toast-icon-wrap {
+    position: relative;
+    flex-shrink: 0;
   }
 
   .toast-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
   }
 
+  /* Success toast */
   .toast-success .toast-icon {
+    background: var(--success-muted);
     color: var(--success);
   }
 
+  .toast-success {
+    border-color: rgba(34, 197, 94, 0.15);
+  }
+
+  /* Error toast */
   .toast-error .toast-icon {
+    background: var(--error-muted);
     color: var(--error);
   }
 
+  .toast-error {
+    border-color: rgba(239, 68, 68, 0.15);
+  }
+
+  /* Warning toast */
   .toast-warning .toast-icon {
+    background: var(--warning-muted);
     color: var(--warning);
   }
 
+  .toast-warning {
+    border-color: rgba(245, 158, 11, 0.15);
+  }
+
+  /* Info toast */
   .toast-info .toast-icon {
+    background: var(--accent-subtle);
     color: var(--text-secondary);
   }
 
@@ -66,22 +126,31 @@
     font-weight: var(--font-medium);
     color: var(--text-primary);
     line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-normal);
+    position: relative;
   }
 
   .toast-dismiss {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     flex-shrink: 0;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     border-radius: var(--radius-sm);
-    transition: all var(--duration-fast) var(--ease-out);
+    position: relative;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
 
   .toast-dismiss:hover {
     background: var(--bg-hover);
-    color: var(--text-primary);
+    color: var(--text-secondary);
+  }
+
+  .toast-dismiss:active {
+    background: var(--bg-active);
   }
 </style>

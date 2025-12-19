@@ -43,20 +43,26 @@
 </script>
 
 <div class="card">
-  <div class="card-bg"></div>
+  <!-- Premium gradient background -->
+  <div class="card-bg">
+    <div class="card-glow"></div>
+  </div>
+
   <div class="card-content">
+    <!-- Header with badge and sync -->
     <div class="card-header">
       <div class="badge">
         <Shield size={10} strokeWidth={2.5} />
         <span>Shielded</span>
       </div>
       {#if syncing}
-        <div class="sync-indicator">
-          <RefreshCw size={12} class="spinning" />
+        <div class="sync-indicator" title="Syncing...">
+          <RefreshCw size={14} class="spinning" />
         </div>
       {/if}
     </div>
 
+    <!-- Balance display -->
     <div class="balance-section">
       <div class="balance">
         <span class="balance-int">{intPart}</span>
@@ -65,20 +71,21 @@
       </div>
       {#if pendingAmount > 0}
         <div class="pending-amount">
-          <ArrowUpRight size={12} strokeWidth={2} />
+          <ArrowUpRight size={11} strokeWidth={2.5} />
           <span>-{formatZec(pendingAmount)} ZEC pending</span>
         </div>
       {/if}
     </div>
 
+    <!-- Address actions -->
     <div class="address-row">
       <button class="address-btn" onclick={handleCopy} class:copied>
-        <span class="address-text">{truncateAddress(address, 10)}</span>
+        <span class="address-text">{truncateAddress(address, 8)}</span>
         <div class="address-icon">
           {#if copied}
-            <Check size={12} strokeWidth={2.5} />
+            <Check size={13} strokeWidth={2.5} />
           {:else}
-            <Copy size={12} strokeWidth={2} />
+            <Copy size={13} strokeWidth={2} />
           {/if}
         </div>
       </button>
@@ -97,7 +104,7 @@
 <style>
   .card {
     position: relative;
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-2xl);
     overflow: hidden;
   }
 
@@ -106,58 +113,85 @@
     inset: 0;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-2xl);
   }
 
+  /* Premium gradient overlay */
   .card-bg::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--gradient-card);
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.01) 30%,
+      transparent 60%
+    );
     border-radius: inherit;
+    pointer-events: none;
   }
 
+  /* Top edge shine */
   .card-bg::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 10%;
-    right: 10%;
+    left: 8%;
+    right: 8%;
     height: 1px;
-    background: linear-gradient(90deg,
+    background: linear-gradient(
+      90deg,
       transparent,
-      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.1),
       transparent
     );
+    pointer-events: none;
+  }
+
+  /* Subtle ambient glow */
+  .card-glow {
+    position: absolute;
+    top: -50%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 100%;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
   }
 
   .card-content {
     position: relative;
     z-index: 1;
-    padding: var(--space-5);
+    padding: var(--space-5) var(--space-5) var(--space-4);
   }
 
   .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
   }
 
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    background: var(--accent-muted);
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2-5);
+    background: var(--accent-subtle);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-full);
     color: var(--text-tertiary);
   }
 
   .badge span {
-    font-size: 10px;
-    font-weight: var(--font-medium);
-    letter-spacing: var(--tracking-wide);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-semibold);
+    letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
   }
 
@@ -169,40 +203,24 @@
     height: 28px;
     border-radius: var(--radius-full);
     background: var(--bg-elevated);
+    border: 1px solid var(--border);
     color: var(--text-tertiary);
   }
 
   .sync-indicator :global(.spinning) {
-    animation: spin 1.2s linear infinite;
+    animation: spin 1s linear infinite;
   }
 
   .balance-section {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-4);
   }
 
   .balance {
     display: flex;
     align-items: baseline;
-    gap: 2px;
-  }
-
-  .pending-amount {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    letter-spacing: var(--tracking-wide);
-    animation: fadeIn var(--duration-normal) var(--ease-out);
-  }
-
-  .pending-amount span {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
   }
 
   .balance-int {
@@ -215,9 +233,9 @@
   }
 
   .balance-dec {
-    font-size: var(--text-xl);
+    font-size: var(--text-lg);
     font-weight: var(--font-semibold);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     letter-spacing: var(--tracking-tight);
     font-variant-numeric: tabular-nums;
   }
@@ -225,9 +243,26 @@
   .balance-unit {
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     margin-left: var(--space-2);
-    letter-spacing: var(--tracking-wider);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .pending-amount {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    letter-spacing: var(--tracking-wide);
+    animation: fadeIn var(--duration-normal) var(--ease-out);
+  }
+
+  .pending-amount span {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs);
   }
 
   .address-row {
@@ -240,56 +275,66 @@
     align-items: center;
     justify-content: space-between;
     flex: 1;
-    padding: var(--space-3) var(--space-4);
-    background: rgba(0, 0, 0, 0.25);
+    min-height: var(--touch-min);
+    padding: 0 var(--space-3);
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    transition: all var(--duration-fast) var(--ease-out);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
   }
 
   .address-btn:hover {
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.4);
     border-color: var(--border-emphasis);
   }
 
   .address-btn:active {
-    transform: scale(0.99);
+    transform: scale(0.98);
   }
 
   .address-btn.copied {
     border-color: var(--success);
+    background: rgba(34, 197, 94, 0.08);
   }
 
   .shuffle-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    background: rgba(0, 0, 0, 0.25);
+    width: var(--touch-min);
+    height: var(--touch-min);
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-tertiary);
-    transition: all var(--duration-fast) var(--ease-out);
     flex-shrink: 0;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
   }
 
   .shuffle-btn:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.4);
     border-color: var(--border-emphasis);
     color: var(--text-secondary);
   }
 
   .shuffle-btn:active:not(:disabled) {
-    transform: scale(0.95);
+    transform: scale(0.92);
   }
 
   .shuffle-btn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
   .shuffle-btn :global(.shuffling) {
-    animation: shuffle 0.5s ease-in-out infinite;
+    animation: shuffle 0.4s ease-in-out infinite;
   }
 
   @keyframes shuffle {
@@ -302,14 +347,14 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-secondary);
-    letter-spacing: var(--tracking-wide);
+    letter-spacing: var(--tracking-normal);
   }
 
   .address-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     transition: color var(--duration-fast) var(--ease-out);
   }
 

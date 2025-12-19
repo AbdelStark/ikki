@@ -33,8 +33,8 @@
   $: subtitle = address
     ? truncateAddress(address, 6)
     : memo
-      ? memo.length > 24
-        ? memo.slice(0, 24) + "..."
+      ? memo.length > 20
+        ? memo.slice(0, 20) + "..."
         : memo
       : formatRelativeTime(timestamp);
 
@@ -58,7 +58,7 @@
 
 <button class="transaction-item" class:pending={status === "pending"} onclick={handleClick}>
   <div class="tx-icon" class:outgoing={isOutgoing} class:incoming={!isOutgoing}>
-    <svelte:component this={IconComponent} size={15} strokeWidth={2} />
+    <svelte:component this={IconComponent} size={16} strokeWidth={2} />
   </div>
 
   <div class="tx-info">
@@ -74,14 +74,14 @@
   </div>
 
   <div class="tx-amount-section">
-    <span class="tx-amount" class:outgoing={isOutgoing}>
+    <span class="tx-amount" class:outgoing={isOutgoing} class:incoming={!isOutgoing}>
       {isOutgoing ? "-" : "+"}{formatZec(displayAmount)}
     </span>
     <span class="tx-unit">ZEC</span>
   </div>
 
   <div class="tx-chevron">
-    <ChevronRight size={14} strokeWidth={2} />
+    <ChevronRight size={16} strokeWidth={1.5} />
   </div>
 </button>
 
@@ -90,17 +90,18 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    min-height: 64px;
     background: transparent;
     border: none;
     cursor: pointer;
     width: 100%;
     text-align: left;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
     transition:
       background var(--duration-fast) var(--ease-out),
       transform var(--duration-fast) var(--ease-out);
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
   }
 
   .transaction-item:hover {
@@ -109,47 +110,54 @@
 
   .transaction-item:active {
     background: var(--bg-active);
-    transform: scale(0.995);
+    transform: scale(0.99);
   }
 
   .transaction-item.pending {
-    opacity: 0.7;
+    opacity: 0.65;
   }
 
+  /* Icon container */
   .tx-icon {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    position: relative;
     transition:
       transform var(--duration-fast) var(--ease-out),
       background var(--duration-fast) var(--ease-out);
-    border: 1px solid var(--border-subtle);
   }
 
   .transaction-item:hover .tx-icon {
-    transform: scale(1.02);
+    transform: scale(1.04);
   }
 
   .tx-icon.outgoing {
     background: var(--bg-elevated);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
   }
 
   .tx-icon.incoming {
-    background: var(--receive-muted);
+    background: linear-gradient(
+      135deg,
+      rgba(228, 228, 231, 0.08) 0%,
+      rgba(228, 228, 231, 0.04) 100%
+    );
+    border: 1px solid rgba(228, 228, 231, 0.1);
     color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.08);
   }
 
+  /* Transaction info */
   .tx-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-0-5);
     min-width: 0;
   }
 
@@ -167,10 +175,10 @@
   }
 
   .tx-badge {
-    font-size: 9px;
+    font-size: var(--text-2xs);
     font-weight: var(--font-semibold);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
+    padding: var(--space-0-5) var(--space-1-5);
+    border-radius: var(--radius-xs);
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
   }
@@ -178,7 +186,8 @@
   .tx-badge.pending {
     background: var(--bg-elevated);
     color: var(--text-tertiary);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border);
+    animation: pulse 2s ease-in-out infinite;
   }
 
   .tx-badge.failed {
@@ -195,10 +204,11 @@
     letter-spacing: var(--tracking-wide);
   }
 
+  /* Amount display */
   .tx-amount-section {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--space-1);
     flex-shrink: 0;
   }
 
@@ -208,28 +218,36 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: var(--tracking-tight);
-    color: var(--text-primary);
   }
 
   .tx-amount.outgoing {
     color: var(--text-secondary);
   }
 
+  .tx-amount.incoming {
+    color: var(--text-primary);
+  }
+
   .tx-unit {
     font-size: var(--text-2xs);
     font-weight: var(--font-medium);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     letter-spacing: var(--tracking-wide);
   }
 
+  /* Chevron indicator */
   .tx-chevron {
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     opacity: 0;
-    transition: opacity var(--duration-fast) var(--ease-out);
-    margin-left: var(--space-2);
+    transform: translateX(-4px);
+    transition:
+      opacity var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+    margin-left: var(--space-1);
   }
 
   .transaction-item:hover .tx-chevron {
     opacity: 0.6;
+    transform: translateX(0);
   }
 </style>
