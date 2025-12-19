@@ -66,6 +66,8 @@ pub struct TransactionRecord {
     pub is_sent: bool,
     /// Memo text if available
     pub memo: Option<String>,
+    /// Whether this transaction is pending (unmined)
+    pub is_pending: bool,
 }
 
 type IkkiWalletDb =
@@ -446,6 +448,8 @@ impl IkkiWallet {
         let conn =
             Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
+        // Include both mined and unmined transactions
+        // Order by mined_height DESC (NULLs first for pending), then by transaction id
         let mut stmt = conn.prepare(
             "SELECT
                 txid,
@@ -453,31 +457,35 @@ impl IkkiWallet {
                 account_balance_delta,
                 block_time,
                 sent_note_count,
-                is_shielding
+                is_shielding,
+                expired_unmined
             FROM v_transactions
-            WHERE mined_height IS NOT NULL
-            ORDER BY mined_height DESC
+            WHERE expired_unmined = 0
+            ORDER BY
+                CASE WHEN mined_height IS NULL THEN 0 ELSE 1 END,
+                mined_height DESC
             LIMIT ?",
         )?;
 
         let rows = stmt.query_map([limit as i64], |row| {
             let txid_bytes: Vec<u8> = row.get(0)?;
-            let _mined_height: Option<u32> = row.get(1)?;
+            let mined_height: Option<u32> = row.get(1)?;
             let balance_delta: i64 = row.get(2)?;
             let block_time: Option<u32> = row.get(3)?;
-            let sent_note_count: i64 = row.get(4)?;
+            let _sent_note_count: i64 = row.get(4)?;
             let is_shielding: bool = row.get(5)?;
+            let _expired: bool = row.get(6)?;
             Ok((
                 txid_bytes,
+                mined_height,
                 balance_delta,
                 block_time,
-                sent_note_count,
                 is_shielding,
             ))
         })?;
 
         let mut transactions = Vec::new();
-        for (txid_bytes, balance_delta, block_time, sent_note_count, is_shielding) in rows.flatten()
+        for (txid_bytes, mined_height, balance_delta, block_time, is_shielding) in rows.flatten()
         {
             let mut txid_arr = [0u8; 32];
             if txid_bytes.len() == 32 {
@@ -489,8 +497,20 @@ impl IkkiWallet {
             // Fetch memo for this transaction
             let memo = self.get_transaction_memo(&conn, &txid_bytes);
 
-            let timestamp = block_time.map(|t| t as u64).unwrap_or(0);
-            let is_sent = sent_note_count > 0 && !is_shielding;
+            // Use current time for pending transactions, block time for mined
+            let timestamp = block_time.map(|t| t as u64).unwrap_or_else(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0)
+            });
+
+            // Determine if sent based on balance delta (negative = sent, positive = received)
+            // Shielding transactions are internal transfers, not real sends
+            let is_sent = balance_delta < 0 && !is_shielding;
+
+            // Determine if pending (unmined)
+            let is_pending = mined_height.is_none();
 
             transactions.push(TransactionRecord {
                 txid,
@@ -498,6 +518,7 @@ impl IkkiWallet {
                 timestamp,
                 is_sent,
                 memo,
+                is_pending,
             });
         }
 

@@ -98,8 +98,12 @@ pub async fn get_transactions(state: State<'_, AppState>) -> Result<Vec<Transact
             timestamp: r.timestamp,
             address: None,
             memo: r.memo,
-            status: TransactionStatus::Confirmed,
-            confirmations: 1, // Simplified - would need to calculate from block height
+            status: if r.is_pending {
+                TransactionStatus::Pending
+            } else {
+                TransactionStatus::Confirmed
+            },
+            confirmations: if r.is_pending { 0 } else { 1 },
         })
         .collect();
 
