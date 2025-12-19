@@ -3,12 +3,14 @@
   import { ui, currentView, needsOnboarding, toasts } from "./lib/stores/ui";
   import { wallet } from "./lib/stores/wallet";
   import { sync, isInitialSyncComplete, isSyncing as isSyncingStore, isFirstSync } from "./lib/stores/sync";
+  import { pendingTransactions, hasActivePending } from "./lib/stores/pendingTransactions";
   import {
     checkWalletExists,
     autoLoadWallet,
     startBackgroundSync,
     getSyncStatus,
     getBalance,
+    getPendingTransactions,
   } from "./lib/utils/tauri";
 
   // Views
@@ -30,6 +32,7 @@
   let loading = true;
   let showInitialSync = false;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let pendingTxPollInterval: ReturnType<typeof setInterval> | null = null;
 
   // Handle wallet ready from onboarding - trigger initial sync
   async function handleWalletReady() {
@@ -104,6 +107,57 @@
     }
   }
 
+  // Poll for pending transaction status updates
+  function startPendingTxPolling() {
+    if (pendingTxPollInterval) return;
+
+    pendingTxPollInterval = setInterval(async () => {
+      try {
+        const pending = await getPendingTransactions();
+        pendingTransactions.setAll(pending);
+
+        // If a transaction just completed (broadcast or failed), refresh balance
+        const justCompleted = pending.filter(tx =>
+          tx.status === "broadcast" || tx.status === "failed"
+        );
+
+        if (justCompleted.length > 0) {
+          // Refresh balance after transaction completes
+          try {
+            const balance = await getBalance();
+            wallet.updateBalance(balance);
+          } catch (e) {
+            console.error("Failed to refresh balance:", e);
+          }
+
+          // Show toast for completed transactions
+          for (const tx of justCompleted) {
+            if (tx.status === "broadcast" && tx.txid) {
+              ui.showToast("Transaction broadcast successfully", "success");
+            }
+          }
+        }
+
+        // Stop polling if no active pending transactions
+        const hasActive = pending.some(tx =>
+          tx.status === "building" || tx.status === "broadcasting"
+        );
+        if (!hasActive && pending.length === 0) {
+          stopPendingTxPolling();
+        }
+      } catch (e) {
+        console.error("Failed to poll pending transactions:", e);
+      }
+    }, 1000); // Poll every second for responsive updates
+  }
+
+  function stopPendingTxPolling() {
+    if (pendingTxPollInterval) {
+      clearInterval(pendingTxPollInterval);
+      pendingTxPollInterval = null;
+    }
+  }
+
   onMount(async () => {
     try {
       const exists = await checkWalletExists();
@@ -123,6 +177,17 @@
           ui.setNeedsOnboarding(false);
           // Mark initial sync as complete for existing wallets
           sync.setInitialSyncComplete(true);
+
+          // Load any pending transactions from backend
+          try {
+            const pending = await getPendingTransactions();
+            if (pending.length > 0) {
+              pendingTransactions.setAll(pending);
+              startPendingTxPolling();
+            }
+          } catch (e) {
+            console.error("Failed to load pending transactions:", e);
+          }
         } else {
           // Config exists but couldn't load - show onboarding
           ui.setNeedsOnboarding(true);
@@ -140,7 +205,13 @@
 
   onDestroy(() => {
     stopPolling();
+    stopPendingTxPolling();
   });
+
+  // Start polling when pending transactions are added
+  $: if ($hasActivePending && !pendingTxPollInterval) {
+    startPendingTxPolling();
+  }
 
   // Show sync indicator when background syncing (not first sync)
   $: showSyncIndicator = $isSyncingStore && !$isFirstSync && !showInitialSync;

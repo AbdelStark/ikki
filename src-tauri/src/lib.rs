@@ -42,6 +42,10 @@ pub fn run() {
             // Transaction commands
             commands::transactions::send_transaction,
             commands::transactions::get_transactions,
+            commands::transactions::send_transaction_background,
+            commands::transactions::get_pending_transactions,
+            commands::transactions::get_pending_transaction,
+            commands::transactions::dismiss_pending_transaction,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

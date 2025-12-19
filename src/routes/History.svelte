@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Loader2 } from "lucide-svelte";
-  import { getTransactions, type Transaction } from "../lib/utils/tauri";
+  import { Loader2, Clock, Check, X } from "lucide-svelte";
+  import { getTransactions, type Transaction, type PendingTransaction } from "../lib/utils/tauri";
+  import { pendingTxList } from "../lib/stores/pendingTransactions";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
+  import PendingTransactionItem from "../lib/components/PendingTransactionItem.svelte";
 
   let transactions: Transaction[] = [];
   let loading = true;
@@ -89,7 +91,7 @@
         </div>
         <p class="error-message">{error}</p>
       </div>
-    {:else if transactions.length === 0}
+    {:else if transactions.length === 0 && $pendingTxList.length === 0}
       <div class="empty-state">
         <div class="empty-icon">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -101,6 +103,22 @@
       </div>
     {:else}
       <div class="transaction-groups">
+        <!-- Pending Transactions -->
+        {#if $pendingTxList.length > 0}
+          <div class="transaction-group pending-group">
+            <div class="group-header">
+              <span class="group-label">Processing</span>
+              <span class="group-count pending">{$pendingTxList.length}</span>
+            </div>
+            <div class="transaction-list pending">
+              {#each $pendingTxList as pendingTx (pendingTx.id)}
+                <PendingTransactionItem {pendingTx} />
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Confirmed Transactions -->
         {#each groupedTransactions as group}
           <div class="transaction-group">
             <div class="group-header">
@@ -304,5 +322,33 @@
 
   .transaction-list > :global(*:not(:last-child)) {
     border-bottom: 1px solid var(--divider);
+  }
+
+  .pending-group {
+    animation: fadeIn var(--duration-normal) var(--ease-out);
+  }
+
+  .group-count.pending {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border-color: var(--border);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .transaction-list.pending {
+    border-color: var(--border-emphasis);
+    background: linear-gradient(
+      135deg,
+      var(--bg-card) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+  }
+
+  .transaction-list.pending::before {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 100%
+    );
   }
 </style>

@@ -1,16 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ArrowLeft, Check, Loader2, Users } from "lucide-svelte";
+  import { ArrowLeft, Check, Loader2, Users, Clock } from "lucide-svelte";
   import { send, sendPhase, sendAmount, sendAddress, sendMemo, sendTxid, sendError, canProceed } from "../lib/stores/send";
   import { balance } from "../lib/stores/wallet";
   import { ui } from "../lib/stores/ui";
-  import { sendTransaction } from "../lib/utils/tauri";
+  import { pendingTransactions } from "../lib/stores/pendingTransactions";
+  import { sendTransactionBackground } from "../lib/utils/tauri";
   import { formatZec, parseZec, truncateAddress } from "../lib/utils/format";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
   const FEE = 10000; // 0.0001 ZEC in zatoshis
   let selectedContactName: string | null = null;
+  let pendingTxId: string | null = null;
 
   onMount(() => {
     // Check for selected contact from contacts view
@@ -60,9 +62,16 @@
     send.setPhase("sending");
     try {
       const amountZatoshis = parseZec($sendAmount);
-      const result = await sendTransaction($sendAddress, amountZatoshis, $sendMemo || undefined);
-      send.setTxid(result.txid);
-      ui.showToast("Transaction sent", "success");
+      // Start background transaction - returns immediately
+      const pendingTx = await sendTransactionBackground($sendAddress, amountZatoshis, $sendMemo || undefined);
+
+      // Add to pending transactions store
+      pendingTransactions.add(pendingTx);
+      pendingTxId = pendingTx.id;
+
+      // Show success - transaction is now being processed in background
+      send.setPhase("complete");
+      ui.showToast("Transaction initiated", "success");
     } catch (e) {
       send.setError(String(e));
       ui.showToast(`Send failed: ${e}`, "error");
@@ -217,16 +226,23 @@
 
     {:else if $sendPhase === "complete"}
       <div class="status-phase">
-        <div class="status-icon success">
-          <Check size={28} strokeWidth={2.5} />
+        <div class="status-icon processing">
+          <Clock size={28} strokeWidth={2} />
         </div>
-        <h2>Sent</h2>
-        <div class="txid-badge">
-          {truncateAddress($sendTxid || "", 14)}
+        <h2>Transaction Initiated</h2>
+        <p class="processing-message">
+          Your transaction is being built and will be broadcast shortly. You can safely navigate away.
+        </p>
+        <div class="processing-info">
+          <div class="processing-dot"></div>
+          <span>Processing in background</span>
         </div>
         <div class="form-actions wide">
           <Button variant="primary" size="lg" fullWidth onclick={handleDone}>
             Done
+          </Button>
+          <Button variant="ghost" size="lg" fullWidth onclick={() => ui.navigate("history")}>
+            View Activity
           </Button>
         </div>
       </div>
@@ -592,6 +608,46 @@
     border: 1px solid rgba(52, 211, 153, 0.2);
     color: var(--receive);
     animation: scaleIn var(--duration-normal) var(--ease-spring);
+  }
+
+  .status-icon.processing {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    animation: scaleIn var(--duration-normal) var(--ease-spring);
+  }
+
+  .processing-message {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    max-width: 280px;
+    line-height: var(--leading-relaxed);
+    text-align: center;
+  }
+
+  .processing-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    margin-top: var(--space-2);
+  }
+
+  .processing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .processing-info span {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    letter-spacing: var(--tracking-wide);
   }
 
   .status-icon.error {

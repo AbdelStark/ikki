@@ -2082,6 +2082,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "zcash_address",
  "zcash_client_backend",
  "zcash_client_memory",

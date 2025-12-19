@@ -77,5 +77,8 @@ time = "0.3"
 chrono = "0.4"
 nonempty = "0.11"
 
+# UUID
+uuid = { version = "1.11", features = ["v4"] }
+
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

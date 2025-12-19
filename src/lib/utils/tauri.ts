@@ -41,6 +41,19 @@ export interface SendResult {
   fee: number;
 }
 
+export type PendingTxStatus = "building" | "broadcasting" | "broadcast" | "failed";
+
+export interface PendingTransaction {
+  id: string;
+  txid: string | null;
+  to_address: string;
+  amount: number;
+  memo: string | null;
+  status: PendingTxStatus;
+  error: string | null;
+  created_at: number;
+}
+
 export interface Transaction {
   txid: string;
   tx_type: "sent" | "received" | "shielding" | "internal";
@@ -124,6 +137,31 @@ export async function sendTransaction(
 
 export async function getTransactions(): Promise<Transaction[]> {
   return invoke<Transaction[]>("get_transactions");
+}
+
+// Background Transaction API
+export async function sendTransactionBackground(
+  toAddress: string,
+  amount: number,
+  memo?: string
+): Promise<PendingTransaction> {
+  return invoke<PendingTransaction>("send_transaction_background", {
+    toAddress,
+    amount,
+    memo: memo || null,
+  });
+}
+
+export async function getPendingTransactions(): Promise<PendingTransaction[]> {
+  return invoke<PendingTransaction[]>("get_pending_transactions");
+}
+
+export async function getPendingTransaction(id: string): Promise<PendingTransaction | null> {
+  return invoke<PendingTransaction | null>("get_pending_transaction", { id });
+}
+
+export async function dismissPendingTransaction(id: string): Promise<void> {
+  return invoke<void>("dismiss_pending_transaction", { id });
 }
 
 // Background Sync API
