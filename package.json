@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@swapkit/sdk": "^4.2.11",
     "@tauri-apps/api": "^2",
     "@types/qrcode": "^1.5.6",
     "lucide-svelte": "^0.468.0",
