@@ -486,6 +486,9 @@ impl IkkiWallet {
             }
             let txid: String = txid_arr.iter().map(|b| format!("{b:02x}")).collect();
 
+            // Fetch memo for this transaction
+            let memo = self.get_transaction_memo(&conn, &txid_bytes);
+
             let timestamp = block_time.map(|t| t as u64).unwrap_or(0);
             let is_sent = sent_note_count > 0 && !is_shielding;
 
@@ -494,10 +497,74 @@ impl IkkiWallet {
                 amount: balance_delta,
                 timestamp,
                 is_sent,
-                memo: None,
+                memo,
             });
         }
 
         Ok(transactions)
+    }
+
+    /// Get memo for a transaction from received notes
+    fn get_transaction_memo(&self, conn: &rusqlite::Connection, txid_bytes: &[u8]) -> Option<String> {
+        // Try to get memo from Orchard received notes first
+        let orchard_memo: Option<String> = conn
+            .query_row(
+                "SELECT rn.memo
+                FROM orchard_received_notes rn
+                JOIN transactions t ON rn.tx = t.id_tx
+                WHERE t.txid = ? AND rn.memo IS NOT NULL
+                LIMIT 1",
+                [txid_bytes],
+                |row| row.get(0),
+            )
+            .ok()
+            .and_then(|memo_bytes: Vec<u8>| Self::decode_memo(&memo_bytes));
+
+        if orchard_memo.is_some() {
+            return orchard_memo;
+        }
+
+        // Try Sapling received notes
+        let sapling_memo: Option<String> = conn
+            .query_row(
+                "SELECT rn.memo
+                FROM sapling_received_notes rn
+                JOIN transactions t ON rn.tx = t.id_tx
+                WHERE t.txid = ? AND rn.memo IS NOT NULL
+                LIMIT 1",
+                [txid_bytes],
+                |row| row.get(0),
+            )
+            .ok()
+            .and_then(|memo_bytes: Vec<u8>| Self::decode_memo(&memo_bytes));
+
+        sapling_memo
+    }
+
+    /// Decode memo bytes to string, filtering out empty memos
+    fn decode_memo(memo_bytes: &[u8]) -> Option<String> {
+        if memo_bytes.is_empty() {
+            return None;
+        }
+
+        // Check for empty memo (all zeros or 0xF6 padding)
+        // Zcash memos are 512 bytes, padded with 0x00 or start with 0xF6 for empty
+        if memo_bytes.first() == Some(&0xF6) {
+            return None;
+        }
+
+        // Find the end of the actual message (strip trailing zeros)
+        let end = memo_bytes
+            .iter()
+            .rposition(|&b| b != 0)
+            .map(|p| p + 1)
+            .unwrap_or(0);
+
+        if end == 0 {
+            return None;
+        }
+
+        // Try to decode as UTF-8
+        String::from_utf8(memo_bytes[..end].to_vec()).ok()
     }
 }
