@@ -6,7 +6,8 @@
   import { ui } from "../lib/stores/ui";
   import { pendingTransactions } from "../lib/stores/pendingTransactions";
   import { sendTransactionBackground } from "../lib/utils/tauri";
-  import { formatZec, parseZec, truncateAddress } from "../lib/utils/format";
+  import { hideAmounts } from "../lib/stores/preferences";
+  import { formatZec, maskedAmount, parseZec, truncateAddress } from "../lib/utils/format";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
@@ -94,6 +95,7 @@
 
   $: amountZatoshis = parseZec($sendAmount);
   $: totalWithFee = amountZatoshis + FEE;
+  $: isHidden = $hideAmounts;
 </script>
 
 <div class="send">
@@ -112,7 +114,7 @@
       <div class="input-phase">
         <div class="balance-display">
           <span class="balance-label">Available</span>
-          <span class="balance-value">{formatZec($balance)} ZEC</span>
+          <span class="balance-value">{isHidden ? maskedAmount() : formatZec($balance)} ZEC</span>
         </div>
 
         <div class="form-section">
@@ -173,7 +175,7 @@
     {:else if $sendPhase === "preview"}
       <div class="preview-phase">
         <div class="preview-amount">
-          <span class="amount-value">{formatZec(amountZatoshis)}</span>
+          <span class="amount-value">{isHidden ? maskedAmount() : formatZec(amountZatoshis)}</span>
           <span class="amount-currency">ZEC</span>
         </div>
 
@@ -185,16 +187,16 @@
           <div class="preview-divider"></div>
           <div class="preview-row">
             <span class="preview-label">Amount</span>
-            <span class="preview-value">{formatZec(amountZatoshis)} ZEC</span>
+            <span class="preview-value">{isHidden ? maskedAmount() : formatZec(amountZatoshis)} ZEC</span>
           </div>
           <div class="preview-row">
             <span class="preview-label">Network fee</span>
-            <span class="preview-value secondary">{formatZec(FEE)} ZEC</span>
+            <span class="preview-value secondary">{isHidden ? maskedAmount() : formatZec(FEE)} ZEC</span>
           </div>
           <div class="preview-divider"></div>
           <div class="preview-row total">
             <span class="preview-label">Total</span>
-            <span class="preview-value">{formatZec(totalWithFee)} ZEC</span>
+            <span class="preview-value">{isHidden ? maskedAmount() : formatZec(totalWithFee)} ZEC</span>
           </div>
           {#if $sendMemo}
             <div class="preview-divider"></div>

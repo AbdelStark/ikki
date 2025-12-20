@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { Copy, Check, RefreshCw, Shield, Shuffle, ArrowUpRight } from "lucide-svelte";
+  import { Copy, Check, RefreshCw, Shield, Shuffle, ArrowUpRight, Eye, EyeOff } from "lucide-svelte";
   import { ui } from "../stores/ui";
   import { wallet } from "../stores/wallet";
-  import { formatZec, truncateAddress, copyToClipboard } from "../utils/format";
+  import { hideAmounts, preferences } from "../stores/preferences";
+  import { zecUsdPrice, pricingLoading } from "../stores/pricing";
+  import { formatFiat, formatZec, maskedAmount, truncateAddress, copyToClipboard } from "../utils/format";
   import { getNewAddress } from "../utils/tauri";
 
   export let balance: number = 0;
@@ -36,10 +38,21 @@
     }
   }
 
+  function toggleBalanceVisibility() {
+    preferences.toggleHideAmounts();
+  }
+
+  $: isHidden = $hideAmounts;
   $: formattedBalance = formatZec(balance);
-  $: [intPart, decPart] = formattedBalance.includes('.')
-    ? formattedBalance.split('.')
-    : [formattedBalance, '00'];
+  $: [intPart, decPart] = isHidden
+    ? [maskedAmount(), maskedAmount("*", 2)]
+    : formattedBalance.includes('.')
+      ? formattedBalance.split('.')
+      : [formattedBalance, '00'];
+  $: formattedPending = isHidden ? maskedAmount() : formatZec(pendingAmount);
+  $: usdRate = $zecUsdPrice;
+  $: usdValue = usdRate ? (balance / 100_000_000) * usdRate : null;
+  $: formattedUsdValue = isHidden ? maskedAmount() : usdValue !== null ? formatFiat(usdValue) : null;
 </script>
 
 <div class="card">
@@ -64,15 +77,43 @@
 
     <!-- Balance display -->
     <div class="balance-section">
-      <div class="balance">
-        <span class="balance-int">{intPart}</span>
-        <span class="balance-dec">.{decPart}</span>
-        <span class="balance-unit">ZEC</span>
+      <div class="balance-row">
+        <div class="balance">
+          <span class="balance-int">{intPart}</span>
+          <span class="balance-dec">.{decPart}</span>
+          <span class="balance-unit">ZEC</span>
+        </div>
+        <button class="toggle-visibility" onclick={toggleBalanceVisibility} aria-label={isHidden ? "Show balances" : "Hide balances"}>
+          {#if isHidden}
+            <EyeOff size={16} strokeWidth={2.25} />
+          {:else}
+            <Eye size={16} strokeWidth={2.25} />
+          {/if}
+        </button>
       </div>
+
+      {#if formattedUsdValue}
+        <div class="fiat-row">
+          <span class="fiat-value">≈ {formattedUsdValue}</span>
+          {#if $pricingLoading}
+            <span class="fiat-hint">Updating USD rate…</span>
+          {:else if usdRate}
+            <span class="fiat-hint">${usdRate.toFixed(2)} per ZEC</span>
+          {:else}
+            <span class="fiat-hint">USD value unavailable</span>
+          {/if}
+        </div>
+      {:else}
+        <div class="fiat-row muted">
+          <span class="fiat-value">≈ {isHidden ? maskedAmount() : "Fetching USD value…"}</span>
+          <span class="fiat-hint">Live conversion</span>
+        </div>
+      {/if}
+
       {#if pendingAmount > 0}
         <div class="pending-amount">
           <ArrowUpRight size={11} strokeWidth={2.5} />
-          <span>-{formatZec(pendingAmount)} ZEC pending</span>
+          <span>-{formattedPending} ZEC pending</span>
         </div>
       {/if}
     </div>
@@ -214,8 +255,15 @@
   .balance-section {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     margin-bottom: var(--space-4);
+  }
+
+  .balance-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
   }
 
   .balance {
@@ -245,6 +293,57 @@
     font-weight: var(--font-medium);
     color: var(--text-muted);
     margin-left: var(--space-2);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .toggle-visibility {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  .toggle-visibility:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--border-emphasis);
+    color: var(--text-secondary);
+  }
+
+  .toggle-visibility:active {
+    transform: scale(0.97);
+  }
+
+  .fiat-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .fiat-row.muted {
+    color: var(--text-tertiary);
+  }
+
+  .fiat-value {
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+  }
+
+  .fiat-hint {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
     letter-spacing: var(--tracking-wide);
   }
 

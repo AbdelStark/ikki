@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ArrowUpRight, Loader2, Check, X } from "lucide-svelte";
-  import { formatZec, truncateAddress } from "../utils/format";
+  import { hideAmounts } from "../stores/preferences";
+  import { formatZec, truncateAddress, maskedAmount } from "../utils/format";
   import { pendingTransactions } from "../stores/pendingTransactions";
   import { dismissPendingTransaction } from "../utils/tauri";
   import type { PendingTransaction } from "../utils/tauri";
@@ -12,6 +13,7 @@
   $: isBroadcast = pendingTx.status === "broadcast";
   $: isFailed = pendingTx.status === "failed";
   $: isProcessing = isBuilding || isBroadcasting;
+  $: isHidden = $hideAmounts;
 
   $: statusText = isBuilding
     ? "Building transaction..."
@@ -57,7 +59,7 @@
   </div>
 
   <div class="tx-amount-section">
-    <span class="tx-amount">-{formatZec(pendingTx.amount)}</span>
+    <span class="tx-amount">-{isHidden ? maskedAmount() : formatZec(pendingTx.amount)}</span>
     <span class="tx-unit">ZEC</span>
   </div>
 
