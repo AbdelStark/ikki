@@ -5,6 +5,7 @@
   import { sync, isInitialSyncComplete, isSyncing as isSyncingStore, isFirstSync } from "./lib/stores/sync";
   import { pendingTransactions, hasActivePending } from "./lib/stores/pendingTransactions";
   import { transactionsStore } from "./lib/stores/transactions";
+  import { pricing } from "./lib/stores/pricing";
   import {
     checkWalletExists,
     autoLoadWallet,
@@ -196,6 +197,7 @@
   }
 
   onMount(async () => {
+    pricing.start();
     try {
       const exists = await checkWalletExists();
       if (exists) {
@@ -246,6 +248,7 @@
   onDestroy(() => {
     stopPolling();
     stopPendingTxPolling();
+    pricing.stop();
   });
 
   // Start polling when pending transactions are added

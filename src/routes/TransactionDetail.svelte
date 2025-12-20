@@ -19,7 +19,8 @@
   } from "lucide-svelte";
   import { selectedTransaction, transaction } from "../lib/stores/transaction";
   import { ui } from "../lib/stores/ui";
-  import { formatZec, truncateAddress, copyToClipboard } from "../lib/utils/format";
+  import { hideAmounts } from "../lib/stores/preferences";
+  import { formatZec, truncateAddress, copyToClipboard, maskedAmount } from "../lib/utils/format";
 
   let copiedField: string | null = null;
 
@@ -27,6 +28,7 @@
 
   $: isOutgoing = tx?.tx_type === "sent";
   $: displayAmount = tx ? Math.abs(tx.amount) : 0;
+  $: isHidden = $hideAmounts;
 
   const labels: Record<string, string> = {
     sent: "Sent",
@@ -112,7 +114,7 @@
 
         <div class="amount-display">
           <span class="amount-sign">{isOutgoing ? "-" : "+"}</span>
-          <span class="amount-value">{formatZec(displayAmount)}</span>
+          <span class="amount-value">{isHidden ? maskedAmount() : formatZec(displayAmount)}</span>
           <span class="amount-unit">ZEC</span>
         </div>
 

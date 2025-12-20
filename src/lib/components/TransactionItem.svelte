@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ArrowUpRight, ArrowDownLeft, Layers, RefreshCw, ChevronRight } from "lucide-svelte";
-  import { formatZec, truncateAddress, formatRelativeTime } from "../utils/format";
+  import { hideAmounts } from "../stores/preferences";
+  import { formatZec, truncateAddress, formatRelativeTime, maskedAmount } from "../utils/format";
   import { transaction } from "../stores/transaction";
   import { ui } from "../stores/ui";
   import type { Transaction } from "../utils/tauri";
@@ -30,6 +31,7 @@
 
   $: isOutgoing = txType === "sent";
   $: displayAmount = Math.abs(amount);
+  $: isHidden = $hideAmounts;
   $: subtitle = address
     ? truncateAddress(address, 6)
     : memo
@@ -75,7 +77,7 @@
 
   <div class="tx-amount-section">
     <span class="tx-amount" class:outgoing={isOutgoing} class:incoming={!isOutgoing}>
-      {isOutgoing ? "-" : "+"}{formatZec(displayAmount)}
+      {isOutgoing ? "-" : "+"}{isHidden ? maskedAmount() : formatZec(displayAmount)}
     </span>
     <span class="tx-unit">ZEC</span>
   </div>
