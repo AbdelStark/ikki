@@ -5,20 +5,25 @@ use crate::swap::{SwapAddress, SwapRecord, AddressType};
 use tauri::State;
 
 /// Get a receiving address for inbound swaps
+///
+/// When prefer_shielded is true, returns a shielded-only unified address
+/// (Orchard + Sapling receivers, no transparent) - this is what Zashi uses
+/// for NEAR Intents swaps as of October 2025.
 #[tauri::command]
 pub async fn get_swap_receiving_address(
     state: State<'_, AppState>,
     prefer_shielded: bool,
 ) -> Result<SwapAddress, String> {
     if prefer_shielded {
-        // Return shielded (unified) address
-        let wallet_guard = state.wallet.lock().await;
-        let wallet = wallet_guard.as_ref().ok_or("Wallet not loaded")?;
-        let address = wallet.get_address().map_err(|e| e.to_string())?;
+        // Generate a new shielded-only unified address (no transparent receiver)
+        // This matches Zashi's approach for NEAR Intents swaps
+        let mut wallet_guard = state.wallet.lock().await;
+        let wallet = wallet_guard.as_mut().ok_or("Wallet not loaded")?;
+        let address = wallet.get_new_address().map_err(|e| e.to_string())?;
         Ok(SwapAddress {
             address,
             address_type: AddressType::Shielded,
-            index: 0,
+            index: 0, // Diversifier index managed internally
         })
     } else {
         // Generate transparent address using generate_ephemeral_address logic
