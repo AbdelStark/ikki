@@ -45,6 +45,9 @@ async function getSwapKitApi() {
   }
 }
 
+// Mock swap status tracking (for simulating progress in dev mode)
+const mockSwapProgress: Map<string, { startTime: number; depositDetected: boolean }> = new Map();
+
 // Mock implementation for development
 const mockSwapKit = {
   async getAssets(): Promise<Asset[]> {
@@ -87,15 +90,42 @@ const mockSwapKit = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async executeSwap(_quote: SwapQuote): Promise<{ intentHash: string; depositAddress: string }> {
     await new Promise((r) => setTimeout(r, 300));
+    const intentHash = `mock-intent-${Date.now()}`;
+    // Initialize mock progress tracking
+    mockSwapProgress.set(intentHash, { startTime: Date.now(), depositDetected: false });
     return {
-      intentHash: `mock-intent-${Date.now()}`,
+      intentHash,
       depositAddress: 't1MockDepositAddress123456789abcdef',
     };
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getStatus(_intentHash: string): Promise<{ status: string; txHash?: string; error?: string }> {
-    return { status: 'PENDING' };
+  async getStatus(intentHash: string): Promise<{ status: string; txHash?: string; error?: string }> {
+    // Simulate realistic status progression based on time elapsed
+    const progress = mockSwapProgress.get(intentHash);
+    if (!progress) {
+      return { status: 'UNKNOWN' };
+    }
+
+    const elapsed = Date.now() - progress.startTime;
+
+    // Simulate status progression:
+    // 0-10s: PENDING (waiting for deposit)
+    // 10-20s: CONFIRMING (deposit detected, confirming)
+    // 20-35s: SWAPPING (swap in progress)
+    // 35-45s: COMPLETING (sending output)
+    // 45s+: COMPLETED
+
+    if (elapsed < 10000) {
+      return { status: 'PENDING' };
+    } else if (elapsed < 20000) {
+      return { status: 'CONFIRMING', txHash: `mock-deposit-tx-${intentHash.slice(-8)}` };
+    } else if (elapsed < 35000) {
+      return { status: 'SWAPPING', txHash: `mock-deposit-tx-${intentHash.slice(-8)}` };
+    } else if (elapsed < 45000) {
+      return { status: 'COMPLETING', txHash: `mock-output-tx-${intentHash.slice(-8)}` };
+    } else {
+      return { status: 'COMPLETED', txHash: `mock-output-tx-${intentHash.slice(-8)}` };
+    }
   },
 };
 

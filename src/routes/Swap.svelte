@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-svelte";
   import { ui } from "../lib/stores/ui";
   import {
@@ -16,6 +16,7 @@
     getInboundQuotes,
     getCrossPayQuotes,
     executeSwap,
+    getSwapStatus,
   } from "../lib/services/swapkit";
   import type { SwapDirection } from "../lib/types/swap";
   import {
@@ -62,6 +63,94 @@
 
   // Check if we're in mock mode
   const isMockMode = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
+
+  // Polling state
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let isPolling = false;
+  let lastPolledStatus = '';
+
+  // Map API status to our SwapStatus type
+  function mapApiStatusToSwapStatus(apiStatus: string, direction: SwapDirection): import("../lib/types/swap").SwapStatus {
+    const statusMap: Record<string, import("../lib/types/swap").SwapStatus> = {
+      'PENDING': direction === 'inbound' ? 'awaiting_deposit' : 'broadcasting_zec',
+      'CONFIRMING': 'deposit_detected',
+      'SWAPPING': 'fulfilling',
+      'COMPLETING': 'fulfilling',
+      'COMPLETED': 'completed',
+      'REFUNDED': 'refunded',
+      'FAILED': 'failed',
+    };
+    return statusMap[apiStatus] || 'awaiting_deposit';
+  }
+
+  // Start polling for swap status
+  async function startStatusPolling(intentHash: string, swapId: string, swapDirection: SwapDirection) {
+    if (isPolling) return;
+    isPolling = true;
+    lastPolledStatus = '';
+
+    console.log('Starting status polling for intent:', intentHash);
+
+    pollingInterval = setInterval(async () => {
+      try {
+        const status = await getSwapStatus(intentHash);
+        console.log('Poll result:', status);
+
+        // Only process if status changed
+        if (status.status === lastPolledStatus) return;
+
+        const previousStatus = lastPolledStatus;
+        lastPolledStatus = status.status;
+
+        const mappedStatus = mapApiStatusToSwapStatus(status.status, swapDirection);
+
+        // Update the swap store
+        swap.updateSwapStatus(mappedStatus);
+
+        // Update database
+        await updateSwapStatus(
+          swapId,
+          mappedStatus,
+          undefined,
+          status.txHash
+        );
+
+        // Handle terminal states
+        if (status.status === 'COMPLETED') {
+          ui.showToast('Swap completed successfully!', 'success');
+          stopStatusPolling();
+        } else if (status.status === 'FAILED') {
+          ui.showToast('Swap failed', 'error');
+          stopStatusPolling();
+        } else if (status.status === 'REFUNDED') {
+          ui.showToast('Swap was refunded', 'info');
+          stopStatusPolling();
+        } else if (status.status === 'CONFIRMING' && previousStatus !== 'CONFIRMING') {
+          // Show deposit detected toast only once
+          ui.showToast('Deposit detected! Processing...', 'info');
+        } else if (status.status === 'SWAPPING' && previousStatus !== 'SWAPPING') {
+          ui.showToast('Swap in progress...', 'info');
+        }
+      } catch (error) {
+        console.error('Status polling error:', error);
+        // Don't stop polling on transient errors
+      }
+    }, 5000); // Poll every 5 seconds
+  }
+
+  // Stop polling
+  function stopStatusPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+    isPolling = false;
+  }
+
+  // Cleanup on component destroy
+  onDestroy(() => {
+    stopStatusPolling();
+  });
 
   // Form state
   let direction: SwapDirection = "inbound"; // inbound = external→ZEC, crosspay = ZEC→external
@@ -219,6 +308,31 @@
       swap.setActiveSwap(newSwap);
       phase = "deposit";
 
+      // For inbound swaps, start polling immediately after showing deposit address
+      if (direction === "inbound" && result.intentHash) {
+        // Save swap record for inbound
+        const swapRecord: SwapRecord = {
+          id: swapId,
+          direction,
+          status: "awaiting_deposit",
+          from_asset: fromAsset.identifier,
+          from_amount: fromAmount,
+          to_asset: toAsset.identifier,
+          to_amount: toAmount,
+          receiving_address: zecAddress.address,
+          ephemeral_address: result.depositAddress,
+          refund_address: refundAddress || undefined,
+          quote_hash: $bestQuote.quoteHash,
+          intent_hash: result.intentHash,
+          created_at: Math.floor(now / 1000),
+          expires_at: Math.floor((now + 30 * 60 * 1000) / 1000),
+        };
+        await saveSwap(swapRecord);
+
+        // Start polling for deposit detection and swap progress
+        startStatusPolling(result.intentHash, swapId, direction);
+      }
+
       // For outbound swaps, send ZEC to the deposit address
       if (direction === "crosspay" && result.depositAddress) {
         // Save the swap record first
@@ -274,6 +388,11 @@
           swap.updateZcashTxid(txResult.txid);
           await updateSwapStatus(swapId, "zec_confirmed", undefined, txResult.txid);
           ui.showToast("ZEC sent! Waiting for swap fulfillment...", "success");
+
+          // Start polling for swap completion
+          if (result.intentHash) {
+            startStatusPolling(result.intentHash, swapId, direction);
+          }
         }
       }
     } catch (error) {
@@ -295,6 +414,7 @@
   }
 
   function reset() {
+    stopStatusPolling(); // Stop any active polling
     selectedAsset = null;
     amount = "";
     refundAddress = "";
