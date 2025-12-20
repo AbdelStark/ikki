@@ -14,8 +14,10 @@
   import {
     getSupportedAssets,
     getInboundQuotes,
+    getCrossPayQuotes,
     executeSwap,
   } from "../lib/services/swapkit";
+  import type { SwapDirection } from "../lib/types/swap";
   import { getSwapReceivingAddress } from "../lib/utils/tauri";
   import type { Asset, ActiveSwap } from "../lib/types/swap";
   import AssetSelector from "../lib/components/AssetSelector.svelte";
@@ -28,12 +30,23 @@
   const isMockMode = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
 
   // Form state
+  let direction: SwapDirection = "inbound"; // inbound = external→ZEC, crosspay = ZEC→external
   let selectedAsset: Asset | null = null;
   let amount = "";
   let amountError = "";
-  let refundAddress = "";
+  let refundAddress = ""; // Source chain refund (external chain for inbound, ZEC for outbound)
+  let destinationAddress = ""; // For outbound: where to receive external asset
   let phase: "input" | "quote" | "deposit" | "status" = "input";
   let confirmLoading = false;
+
+  // ZEC asset constant
+  const ZEC_ASSET: Asset = {
+    chain: "ZEC",
+    symbol: "ZEC",
+    identifier: "ZEC.ZEC",
+    name: "Zcash",
+    decimals: 8,
+  };
 
   // Amount validation
   function validateAmount(value: string): string {
@@ -76,14 +89,33 @@
       return;
     }
 
+    // For outbound, destination address is required
+    if (direction === "crosspay" && !destinationAddress) {
+      ui.showToast("Please enter a destination address", "error");
+      return;
+    }
+
     swap.setQuotesLoading(true);
     try {
-      const address = await getSwapReceivingAddress(true);
-      const fetchedQuotes = await getInboundQuotes(
-        selectedAsset.identifier,
-        amount,
-        address.address
-      );
+      let fetchedQuotes;
+      if (direction === "inbound") {
+        // External asset → ZEC
+        const address = await getSwapReceivingAddress(true);
+        fetchedQuotes = await getInboundQuotes(
+          selectedAsset.identifier,
+          amount,
+          address.address
+        );
+      } else {
+        // ZEC → External asset (CrossPay)
+        const zecAddress = await getSwapReceivingAddress(true);
+        fetchedQuotes = await getCrossPayQuotes(
+          selectedAsset.identifier,
+          amount,
+          destinationAddress,
+          zecAddress.address
+        );
+      }
       swap.setQuotes(fetchedQuotes);
       phase = "quote";
     } catch (error) {
@@ -104,31 +136,43 @@
 
     confirmLoading = true;
     try {
-      const address = await getSwapReceivingAddress(true);
-      const result = await executeSwap($bestQuote, {
-        sourceAddress: address.address, // ZEC address (used for CrossPay, not inbound)
-        destinationAddress: address.address, // ZEC address where user receives funds
-        sourceChainRefundAddress: refundAddress || undefined, // User's address on source chain
-        zecRefundAddress: address.address, // Always use shielded unified address for ZEC refunds
-      });
+      const zecAddress = await getSwapReceivingAddress(true);
+
+      // Build params based on direction
+      const swapParams = direction === "inbound"
+        ? {
+            sourceAddress: zecAddress.address,
+            destinationAddress: zecAddress.address, // Receive ZEC here
+            sourceChainRefundAddress: refundAddress || undefined,
+            zecRefundAddress: zecAddress.address,
+          }
+        : {
+            sourceAddress: zecAddress.address, // Send ZEC from here
+            destinationAddress: destinationAddress, // Receive external asset here
+            sourceChainRefundAddress: zecAddress.address, // ZEC refund goes back to shielded
+            zecRefundAddress: zecAddress.address,
+          };
+
+      const result = await executeSwap($bestQuote, swapParams);
+
+      // Build swap record based on direction
+      const fromAsset = direction === "inbound" ? selectedAsset : ZEC_ASSET;
+      const toAsset = direction === "inbound" ? ZEC_ASSET : selectedAsset;
+      const fromAmount = direction === "inbound" ? amount : $bestQuote.fromAmount;
+      const toAmount = direction === "inbound" ? $bestQuote.toAmount : amount;
 
       const newSwap: ActiveSwap = {
         id: crypto.randomUUID(),
-        direction: "inbound",
+        direction,
         status: "awaiting_deposit",
-        fromAsset: selectedAsset,
-        fromAmount: amount,
-        toAsset: {
-          chain: "ZEC",
-          symbol: "ZEC",
-          identifier: "ZEC.ZEC",
-          name: "Zcash",
-          decimals: 8,
-        },
-        toAmount: $bestQuote.toAmount,
+        fromAsset,
+        fromAmount,
+        toAsset,
+        toAmount,
         depositAddress: result.depositAddress,
-        receivingAddress: address.address,
-        refundAddress,
+        receivingAddress: direction === "inbound" ? zecAddress.address : destinationAddress,
+        recipientAddress: direction === "crosspay" ? destinationAddress : undefined,
+        refundAddress: direction === "inbound" ? refundAddress : zecAddress.address,
         quoteHash: $bestQuote.quoteHash,
         intentHash: result.intentHash,
         createdAt: Date.now(),
@@ -157,12 +201,26 @@
     selectedAsset = null;
     amount = "";
     refundAddress = "";
+    destinationAddress = "";
     swap.clearQuotes();
     swap.clearActiveSwap();
     phase = "input";
   }
 
-  $: canGetQuote = selectedAsset && parseFloat(amount) > 0 && !amountError;
+  function toggleDirection() {
+    direction = direction === "inbound" ? "crosspay" : "inbound";
+    // Reset form when switching direction
+    selectedAsset = null;
+    amount = "";
+    amountError = "";
+    refundAddress = "";
+    destinationAddress = "";
+    swap.clearQuotes();
+  }
+
+  // For outbound swaps, also need destination address
+  $: canGetQuote = selectedAsset && parseFloat(amount) > 0 && !amountError &&
+    (direction === "inbound" || destinationAddress.length > 0);
 </script>
 
 <div class="swap-page">
@@ -178,7 +236,7 @@
       <button class="back-button" onclick={handleBack}>
         <ArrowLeft size={20} strokeWidth={2} />
       </button>
-      <h1>Swap to ZEC</h1>
+      <h1>{direction === "inbound" ? "Swap to ZEC" : "Swap from ZEC"}</h1>
       <div class="header-spacer"></div>
     </header>
   {/if}
@@ -186,56 +244,134 @@
   <div class="swap-content">
     {#if phase === "input"}
       <div class="input-phase">
-        <div class="form-section">
-          <div class="field-label">From</div>
-          <div class="from-row">
-            <AssetSelector
-              assets={$supportedAssets}
-              selected={selectedAsset}
-              onSelect={(a) => (selectedAsset = a)}
-            />
-            <div class="amount-input-wrap">
-              <Input
-                type="text"
-                inputmode="decimal"
-                placeholder="0.00"
-                value={amount}
-                oninput={handleAmountInput}
+        <!-- Direction Toggle -->
+        <div class="direction-toggle">
+          <button
+            class="direction-btn"
+            class:active={direction === "inbound"}
+            onclick={() => direction !== "inbound" && toggleDirection()}
+          >
+            Receive ZEC
+          </button>
+          <button
+            class="direction-btn"
+            class:active={direction === "crosspay"}
+            onclick={() => direction !== "crosspay" && toggleDirection()}
+          >
+            Send ZEC
+          </button>
+        </div>
+
+        {#if direction === "inbound"}
+          <!-- INBOUND: External → ZEC -->
+          <div class="form-section">
+            <div class="field-label">From</div>
+            <div class="from-row">
+              <AssetSelector
+                assets={$supportedAssets}
+                selected={selectedAsset}
+                onSelect={(a) => (selectedAsset = a)}
               />
-              {#if amountError}
-                <p class="amount-error">{amountError}</p>
-              {/if}
+              <div class="amount-input-wrap">
+                <Input
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  value={amount}
+                  oninput={handleAmountInput}
+                />
+                {#if amountError}
+                  <p class="amount-error">{amountError}</p>
+                {/if}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="swap-arrow">
-          <RefreshCw size={20} />
-        </div>
-
-        <div class="form-section">
-          <div class="field-label">To</div>
-          <div class="to-display">
-            <span class="zec-badge">ZEC</span>
-            <span class="estimated">≈ {$bestQuote?.toAmount || "—"}</span>
+          <div class="swap-arrow">
+            <RefreshCw size={20} />
           </div>
-        </div>
 
-        <div class="form-section">
-          <Input
-            label={`${selectedAsset?.symbol || "Source"} refund address`}
-            placeholder={`Your ${selectedAsset?.symbol || ""} wallet address`}
-            value={refundAddress}
-            oninput={(e) => (refundAddress = e.currentTarget.value)}
-          />
-          <div class="refund-warning">
-            <AlertTriangle size={14} />
-            <p>
-              <strong>Important:</strong> If the swap fails, your {selectedAsset?.symbol || "funds"} will be returned to this address.
-              Without a refund address, failed swaps may result in lost funds.
+          <div class="form-section">
+            <div class="field-label">To</div>
+            <div class="to-display">
+              <span class="zec-badge">ZEC</span>
+              <span class="estimated">≈ {$bestQuote?.toAmount || "—"}</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <Input
+              label={`${selectedAsset?.symbol || "Source"} refund address`}
+              placeholder={`Your ${selectedAsset?.symbol || ""} wallet address`}
+              value={refundAddress}
+              oninput={(e) => (refundAddress = e.currentTarget.value)}
+            />
+            <div class="refund-warning">
+              <AlertTriangle size={14} />
+              <p>
+                <strong>Important:</strong> If the swap fails, your {selectedAsset?.symbol || "funds"} will be returned to this address.
+                Without a refund address, failed swaps may result in lost funds.
+              </p>
+            </div>
+          </div>
+        {:else}
+          <!-- OUTBOUND: ZEC → External (CrossPay) -->
+          <div class="form-section">
+            <div class="field-label">From</div>
+            <div class="to-display">
+              <span class="zec-badge">ZEC</span>
+              <span class="balance-hint">Shielded balance</span>
+            </div>
+          </div>
+
+          <div class="swap-arrow">
+            <RefreshCw size={20} />
+          </div>
+
+          <div class="form-section">
+            <div class="field-label">To</div>
+            <div class="from-row">
+              <AssetSelector
+                assets={$supportedAssets}
+                selected={selectedAsset}
+                onSelect={(a) => (selectedAsset = a)}
+              />
+              <div class="amount-input-wrap">
+                <Input
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  value={amount}
+                  oninput={handleAmountInput}
+                />
+                {#if amountError}
+                  <p class="amount-error">{amountError}</p>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <Input
+              label={`${selectedAsset?.symbol || "Destination"} receiving address`}
+              placeholder={`Your ${selectedAsset?.symbol || ""} wallet address`}
+              value={destinationAddress}
+              oninput={(e) => (destinationAddress = e.currentTarget.value)}
+            />
+            <p class="field-hint">
+              Where you'll receive your {selectedAsset?.symbol || "funds"} after the swap
             </p>
           </div>
-        </div>
+
+          {#if $bestQuote}
+            <div class="form-section">
+              <div class="zec-cost">
+                <span class="cost-label">ZEC required</span>
+                <span class="cost-value">≈ {$bestQuote.fromAmount} ZEC</span>
+              </div>
+            </div>
+          {/if}
+        {/if}
 
         <div class="form-actions">
           <Button
@@ -257,15 +393,27 @@
     {:else if phase === "quote"}
       <div class="quote-phase">
         <div class="quote-summary">
-          <div class="quote-from">
-            <span class="quote-amount">{amount}</span>
-            <span class="quote-symbol">{selectedAsset?.symbol}</span>
-          </div>
-          <div class="quote-arrow">→</div>
-          <div class="quote-to">
-            <span class="quote-amount">{$bestQuote?.toAmount}</span>
-            <span class="quote-symbol">ZEC</span>
-          </div>
+          {#if direction === "inbound"}
+            <div class="quote-from">
+              <span class="quote-amount">{amount}</span>
+              <span class="quote-symbol">{selectedAsset?.symbol}</span>
+            </div>
+            <div class="quote-arrow">→</div>
+            <div class="quote-to">
+              <span class="quote-amount">{$bestQuote?.toAmount}</span>
+              <span class="quote-symbol">ZEC</span>
+            </div>
+          {:else}
+            <div class="quote-from">
+              <span class="quote-amount">{$bestQuote?.fromAmount}</span>
+              <span class="quote-symbol">ZEC</span>
+            </div>
+            <div class="quote-arrow">→</div>
+            <div class="quote-to">
+              <span class="quote-amount">{amount}</span>
+              <span class="quote-symbol">{selectedAsset?.symbol}</span>
+            </div>
+          {/if}
         </div>
 
         <div class="quote-details">
@@ -339,6 +487,64 @@
     color: rgb(245, 158, 11);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
+  }
+
+  .direction-toggle {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-1);
+    gap: var(--space-1);
+  }
+
+  .direction-btn {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .direction-btn:hover {
+    color: var(--text-primary);
+  }
+
+  .direction-btn.active {
+    background: var(--accent-muted);
+    color: var(--text-primary);
+  }
+
+  .balance-hint {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+  }
+
+  .zec-cost {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .cost-label {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+  }
+
+  .cost-value {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    font-family: var(--font-mono);
+    color: var(--text-primary);
   }
 
   .swap-header {
