@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ArrowLeft, RefreshCw } from "lucide-svelte";
+  import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-svelte";
   import { ui } from "../lib/stores/ui";
   import {
     swap,
@@ -24,11 +24,41 @@
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
+  // Check if we're in mock mode
+  const isMockMode = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
+
   // Form state
   let selectedAsset: Asset | null = null;
   let amount = "";
+  let amountError = "";
   let refundAddress = "";
   let phase: "input" | "quote" | "deposit" | "status" = "input";
+  let confirmLoading = false;
+
+  // Amount validation
+  function validateAmount(value: string): string {
+    if (!value) return "";
+
+    // Check if it's a valid number
+    if (!/^\d*\.?\d*$/.test(value)) {
+      return "Please enter a valid number";
+    }
+
+    const num = parseFloat(value);
+    if (isNaN(num)) return "Please enter a valid number";
+    if (num <= 0) return "Amount must be greater than 0";
+    if (num < 0.0001) return "Amount too small (min: 0.0001)";
+
+    return "";
+  }
+
+  function handleAmountInput(e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    // Only allow digits and one decimal point
+    const cleaned = target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+    amount = cleaned;
+    amountError = validateAmount(cleaned);
+  }
 
   onMount(async () => {
     // Load supported assets
@@ -38,6 +68,13 @@
 
   async function fetchQuotes() {
     if (!selectedAsset || !amount) return;
+
+    // Validate amount before fetching
+    const error = validateAmount(amount);
+    if (error) {
+      amountError = error;
+      return;
+    }
 
     swap.setQuotesLoading(true);
     try {
@@ -57,6 +94,15 @@
   async function confirmSwap() {
     if (!$bestQuote || !selectedAsset) return;
 
+    // Check if quote has expired
+    if ($bestQuote.expiresAt < Date.now()) {
+      ui.showToast("Quote has expired. Please get a new quote.", "error");
+      swap.clearQuotes();
+      phase = "input";
+      return;
+    }
+
+    confirmLoading = true;
     try {
       const address = await getSwapReceivingAddress(true);
       const result = await executeSwap($bestQuote, {
@@ -92,6 +138,8 @@
       phase = "deposit";
     } catch (error) {
       ui.showToast(`Failed to start swap: ${error}`, "error");
+    } finally {
+      confirmLoading = false;
     }
   }
 
@@ -113,10 +161,17 @@
     phase = "input";
   }
 
-  $: canGetQuote = selectedAsset && parseFloat(amount) > 0;
+  $: canGetQuote = selectedAsset && parseFloat(amount) > 0 && !amountError;
 </script>
 
 <div class="swap-page">
+  {#if isMockMode}
+    <div class="mock-banner">
+      <AlertTriangle size={14} />
+      <span>Test Mode - Swaps are simulated</span>
+    </div>
+  {/if}
+
   {#if phase !== "deposit" && phase !== "status"}
     <header class="swap-header">
       <button class="back-button" onclick={handleBack}>
@@ -138,13 +193,18 @@
               selected={selectedAsset}
               onSelect={(a) => (selectedAsset = a)}
             />
-            <Input
-              type="text"
-              inputmode="decimal"
-              placeholder="0.00"
-              value={amount}
-              oninput={(e) => (amount = e.currentTarget.value)}
-            />
+            <div class="amount-input-wrap">
+              <Input
+                type="text"
+                inputmode="decimal"
+                placeholder="0.00"
+                value={amount}
+                oninput={handleAmountInput}
+              />
+              {#if amountError}
+                <p class="amount-error">{amountError}</p>
+              {/if}
+            </div>
           </div>
         </div>
 
@@ -162,14 +222,18 @@
 
         <div class="form-section">
           <Input
-            label="Refund address (optional)"
+            label="Refund address"
             placeholder={`Your ${selectedAsset?.symbol || ""} address`}
             value={refundAddress}
             oninput={(e) => (refundAddress = e.currentTarget.value)}
           />
-          <p class="field-hint">
-            If the swap fails, funds will be returned here
-          </p>
+          <div class="refund-warning">
+            <AlertTriangle size={14} />
+            <p>
+              <strong>Important:</strong> If the swap fails, funds will be returned to this address.
+              Without a refund address, failed swaps may result in lost funds.
+            </p>
+          </div>
         </div>
 
         <div class="form-actions">
@@ -219,10 +283,10 @@
         </div>
 
         <div class="form-actions">
-          <Button variant="primary" size="lg" fullWidth onclick={confirmSwap}>
-            Confirm Swap
+          <Button variant="primary" size="lg" fullWidth onclick={confirmSwap} disabled={confirmLoading}>
+            {confirmLoading ? "Confirming..." : "Confirm Swap"}
           </Button>
-          <Button variant="ghost" size="lg" fullWidth onclick={handleBack}>
+          <Button variant="ghost" size="lg" fullWidth onclick={handleBack} disabled={confirmLoading}>
             Back
           </Button>
         </div>
@@ -261,6 +325,19 @@
     display: flex;
     flex-direction: column;
     background: var(--bg-primary);
+  }
+
+  .mock-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: rgba(245, 158, 11, 0.15);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+    color: rgb(245, 158, 11);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
   }
 
   .swap-header {
@@ -336,6 +413,19 @@
     align-items: flex-start;
   }
 
+  .amount-input-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .amount-error {
+    font-size: var(--text-xs);
+    color: var(--error);
+    margin: 0;
+  }
+
   .swap-arrow {
     display: flex;
     justify-content: center;
@@ -370,6 +460,26 @@
   .field-hint {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
+  }
+
+  .refund-warning {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-md);
+    color: rgb(217, 119, 6);
+  }
+
+  .refund-warning p {
+    font-size: var(--text-xs);
+    line-height: var(--leading-relaxed);
+    margin: 0;
+  }
+
+  .refund-warning strong {
+    font-weight: var(--font-semibold);
   }
 
   .form-actions {
