@@ -1,0 +1,18 @@
+[package]
+name = "webzjs-wasm-poc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+bip0039 = "0.12"
+getrandom = { version = "0.2", features = ["js"] }
+zcash_keys = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", default-features = false, features = ["orchard", "sapling", "transparent-inputs"] }
+zcash_protocol = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6" }
+zip32 = "0.2"
