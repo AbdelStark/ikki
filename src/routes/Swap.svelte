@@ -60,7 +60,8 @@
     try {
       const address = await getSwapReceivingAddress(true);
       const result = await executeSwap($bestQuote, {
-        userAddress: address.address,
+        sourceAddress: address.address, // ZEC address (used for CrossPay, not inbound)
+        destinationAddress: address.address, // ZEC address where user receives funds
         refundAddress: refundAddress || undefined,
       });
 
