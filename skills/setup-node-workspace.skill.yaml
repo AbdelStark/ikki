@@ -1,0 +1,37 @@
+version: "1.0"
+name: setup-node-workspace
+description: >
+  Prepare the Ikki workspace for frontend development: install Node
+  dependencies, verify toolchain versions, and cache the build output.
+maintainer: platform@ikki
+when_to_use:
+  - Setting up a fresh checkout.
+  - Before running builds if dependencies changed.
+tags: [setup, node, build]
+prerequisites:
+  - command: "node -v"
+    reason: "Requires Node.js 18+."
+  - command: "npm -v"
+    reason: "Ensure npm is available."
+steps:
+  - description: Check Node and npm versions.
+    command: |
+      node -v && npm -v
+    capture: [stdout, stderr]
+  - description: Install dependencies.
+    command: |
+      npm install
+    capture: [stdout, stderr]
+  - description: Optional sanity build (skippable for quick setup).
+    command: |
+      npm run build
+    capture: [stdout, stderr]
+    notes:
+      - "Use when validating environment health or before committing."
+artifacts:
+  - name: npm-install-log
+    type: log
+    description: Output from `npm install` and optional build.
+references:
+  - path: package.json
+  - path: AGENTS.md

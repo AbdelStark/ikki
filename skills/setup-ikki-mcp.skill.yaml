@@ -1,0 +1,37 @@
+version: "1.0"
+name: setup-ikki-mcp
+description: >
+  Install and register the Ikki MCP automation server for UI testing and
+  scripted interactions with Claude Code.
+maintainer: platform@ikki
+when_to_use:
+  - Automating UI walkthroughs or screenshot capture.
+  - Running MCP tools from Claude Code sessions.
+tags: [automation, mcp, setup]
+prerequisites:
+  - command: "bun -v"
+    reason: "MCP server uses Bun; install Bun if missing."
+  - command: "npm install"
+    reason: "Ensure Node deps are available for the main project."
+steps:
+  - description: Install Bun dependencies for the MCP server.
+    command: |
+      cd tools/ikki-mcp && bun install
+    capture: [stdout, stderr]
+  - description: Register the MCP server with Claude Code (project scope).
+    notes:
+      - "Command: `claude mcp add ikki-automation --scope project -- bun run /path/to/ikki/tools/ikki-mcp/src/index.ts`."
+      - "Or add the entry manually to `.mcp.json` as shown in README."
+  - description: Verify the CLI entrypoint.
+    command: |
+      cd tools/ikki-mcp && bun run src/index.ts --help || true
+    capture: [stdout, stderr]
+    notes:
+      - "The command prints available tools if the MCP server is reachable."
+artifacts:
+  - name: mcp-setup-log
+    type: log
+    description: Installation and verification output from Bun commands.
+references:
+  - path: README.md
+  - path: tools/ikki-mcp/
