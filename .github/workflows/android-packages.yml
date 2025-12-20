@@ -1,0 +1,98 @@
+name: Android Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/android-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "src-tauri/**"
+      - "vite.config.ts"
+      - "svelte.config.js"
+  pull_request:
+    paths:
+      - ".github/workflows/android-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "src-tauri/**"
+      - "vite.config.ts"
+      - "svelte.config.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Android package
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        uses: android-actions/setup-ndk@v3
+        with:
+          ndk-version: r25c
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android platform tools
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            x86_64-linux-android,
+            i686-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install --locked cargo-ndk
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Initialize Android project (if needed)
+        run: |
+          if [ ! -d src-tauri/gen/android ]; then
+            npm run tauri:android:init -- --ci
+          fi
+
+      - name: Build Android debug package (APK only)
+        run: npm run tauri:android:build -- --debug --apk true --aab false
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug
+          path: |
+            src-tauri/gen/android/app/build/outputs/**/*.apk
+          if-no-files-found: warn
