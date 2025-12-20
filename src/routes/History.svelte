@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Loader2, Clock, Check, X } from "lucide-svelte";
-  import { type Transaction, type PendingTransaction } from "../lib/utils/tauri";
+  import { Loader2, Search, SlidersHorizontal, X } from "lucide-svelte";
+  import { type Transaction } from "../lib/utils/tauri";
   import { pendingTxList } from "../lib/stores/pendingTransactions";
   import { transactions as txStore, transactionsLoading, transactionsLoaded } from "../lib/stores/transactions";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
@@ -10,10 +10,82 @@
   $: transactions = $txStore;
   $: loading = !$transactionsLoaded;
   let error: string | null = null;
+  let searchQuery = "";
+  type TransactionTypeFilter = "all" | Transaction["tx_type"];
+  type TransactionStatusFilter = "all" | Transaction["status"];
+  type SortOption = "newest" | "oldest" | "amount-high" | "amount-low";
+
+  let typeFilter: TransactionTypeFilter = "all";
+  let statusFilter: TransactionStatusFilter = "all";
+  let sortOption: SortOption = "newest";
+
+  const typeOptions: { value: TransactionTypeFilter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "received", label: "Received" },
+    { value: "sent", label: "Sent" },
+    { value: "shielding", label: "Shielded" },
+    { value: "internal", label: "Internal" },
+  ];
+
+  const statusOptions: { value: TransactionStatusFilter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "pending", label: "Pending" },
+    { value: "failed", label: "Failed" },
+  ];
+
+  const sortOptions = [
+    { value: "newest", label: "Newest first" },
+    { value: "oldest", label: "Oldest first" },
+    { value: "amount-high", label: "Amount: high to low" },
+    { value: "amount-low", label: "Amount: low to high" },
+  ];
 
   interface GroupedTransactions {
     label: string;
     transactions: Transaction[];
+  }
+
+  function matchesSearchTerm(value: string | null | undefined, term: string): boolean {
+    return (value ?? "").toLowerCase().includes(term);
+  }
+
+  function filterTransactions(
+    txs: Transaction[],
+    term: string,
+    type: TransactionTypeFilter,
+    status: TransactionStatusFilter
+  ): Transaction[] {
+    return txs.filter((tx) => {
+      const matchesType = type === "all" || tx.tx_type === type;
+      const matchesStatus = status === "all" || tx.status === status;
+      const matchesSearch =
+        term.length === 0 ||
+        [tx.txid, tx.address, tx.memo, tx.tx_type, tx.status].some((field) =>
+          matchesSearchTerm(field, term)
+        );
+
+      return matchesType && matchesStatus && matchesSearch;
+    });
+  }
+
+  function sortTransactions(txs: Transaction[], option: SortOption): Transaction[] {
+    const sorted = [...txs];
+
+    sorted.sort((a, b) => {
+      if (option === "newest") return b.timestamp - a.timestamp;
+      if (option === "oldest") return a.timestamp - b.timestamp;
+
+      const aAmount = Math.abs(a.amount);
+      const bAmount = Math.abs(b.amount);
+
+      if (option === "amount-high") return bAmount - aAmount || b.timestamp - a.timestamp;
+      if (option === "amount-low") return aAmount - bAmount || b.timestamp - a.timestamp;
+
+      return 0;
+    });
+
+    return sorted;
   }
 
   function groupTransactionsByDate(txs: Transaction[]): GroupedTransactions[] {
@@ -54,18 +126,94 @@
       .map(([label, transactions]) => ({ label, transactions }));
   }
 
-  $: groupedTransactions = groupTransactionsByDate(transactions);
+  $: searchTerm = searchQuery.trim().toLowerCase();
+  $: filteredTransactions = filterTransactions(transactions, searchTerm, typeFilter, statusFilter);
+  $: sortedTransactions = sortTransactions(filteredTransactions, sortOption);
+  $: groupedTransactions = groupTransactionsByDate(sortedTransactions);
+  $: filteredPendingTransactions = $pendingTxList.filter((pendingTx) => {
+    if (searchTerm.length === 0) return true;
+
+    return [pendingTx.to_address, pendingTx.txid, pendingTx.memo, pendingTx.id].some((field) =>
+      matchesSearchTerm(field, searchTerm)
+    );
+  });
+  $: hasAnyActivity = transactions.length > 0 || $pendingTxList.length > 0;
+  $: visibleCount = sortedTransactions.length + filteredPendingTransactions.length;
+  $: hasResults = visibleCount > 0;
 </script>
 
 <div class="history">
   <header class="history-header">
     <h1>Activity</h1>
-    {#if transactions.length > 0}
-      <span class="tx-count">{transactions.length}</span>
+    {#if visibleCount > 0}
+      <span class="tx-count">{visibleCount}</span>
     {/if}
   </header>
 
   <div class="history-content">
+    <div class="filters-panel">
+      <div class="search-bar">
+        <Search size={16} />
+        <input
+          type="text"
+          placeholder="Search by address, memo, or tx ID"
+          bind:value={searchQuery}
+          aria-label="Search transactions"
+        />
+        {#if searchQuery.length > 0}
+          <button class="clear-search" on:click={() => (searchQuery = "")} aria-label="Clear search">
+            <X size={14} />
+          </button>
+        {/if}
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-group">
+          <div class="filter-label">Type</div>
+          <div class="chip-row">
+            {#each typeOptions as option}
+              <button
+                class="filter-chip"
+                class:active={typeFilter === option.value}
+                on:click={() => (typeFilter = option.value)}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-label">Status</div>
+          <div class="chip-row">
+            {#each statusOptions as option}
+              <button
+                class="filter-chip"
+                class:active={statusFilter === option.value}
+                on:click={() => (statusFilter = option.value)}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <div class="filter-group sort-group">
+          <div class="filter-label">
+            <SlidersHorizontal size={14} />
+            <span>Sort</span>
+          </div>
+          <div class="sort-select">
+            <select bind:value={sortOption} aria-label="Sort transactions">
+              {#each sortOptions as option}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
     {#if loading}
       <div class="loading-state">
         <Loader2 size={22} class="spin" />
@@ -82,7 +230,7 @@
         </div>
         <p class="error-message">{error}</p>
       </div>
-    {:else if transactions.length === 0 && $pendingTxList.length === 0}
+    {:else if !hasAnyActivity}
       <div class="empty-state">
         <div class="empty-icon">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -92,17 +240,29 @@
         <h3>No transactions yet</h3>
         <p>Your activity will appear here</p>
       </div>
+    {:else if !hasResults}
+      <div class="empty-state filter-empty">
+        <div class="empty-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+          </svg>
+        </div>
+        <h3>No matching activity</h3>
+        <p>Try a different search, filter, or sort option.</p>
+      </div>
     {:else}
       <div class="transaction-groups">
         <!-- Pending Transactions -->
-        {#if $pendingTxList.length > 0}
+        {#if filteredPendingTransactions.length > 0}
           <div class="transaction-group pending-group">
             <div class="group-header">
               <span class="group-label">Processing</span>
-              <span class="group-count pending">{$pendingTxList.length}</span>
+              <span class="group-count pending">{filteredPendingTransactions.length}</span>
             </div>
             <div class="transaction-list pending">
-              {#each $pendingTxList as pendingTx (pendingTx.id)}
+              {#each filteredPendingTransactions as pendingTx (pendingTx.id)}
                 <PendingTransactionItem {pendingTx} />
               {/each}
             </div>
@@ -176,6 +336,134 @@
     flex: 1;
     padding: 0 var(--space-5) var(--space-5);
     padding-bottom: calc(var(--nav-height) + var(--space-4));
+  }
+
+  .filters-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    color: var(--text-secondary);
+  }
+
+  .search-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    outline: none;
+  }
+
+  .clear-search {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .clear-search:hover {
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+  }
+
+  .filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .filter-label {
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--text-tertiary);
+    letter-spacing: var(--tracking-wide);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .filter-chip {
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    letter-spacing: var(--tracking-wide);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+
+  .filter-chip:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .filter-chip.active {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-emphasis);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .sort-group {
+    align-self: flex-start;
+  }
+
+  .sort-select select {
+    width: 100%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    appearance: none;
+    outline: none;
+  }
+
+  .filter-empty {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
   }
 
   .loading-state {
