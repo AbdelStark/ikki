@@ -9,7 +9,7 @@
 <h4 align="center">A privacy-first Zcash wallet with a premium mobile experience.</h4>
 
 <p align="center">
-  <a href="https://github.com/AbdelStark/ikki/releases"><img src="https://img.shields.io/github/v/release/AbdelStark/ikki?style=flat-square&color=8b5cf6" alt="Release"></a>
+  <a href="https://github.com/AbdelStark/ikki/actions/workflows/ci.yml"><img src="https://github.com/AbdelStark/ikki/actions/workflows/ci.yml/badge.svg?branch=main&style=flat-square" alt="CI"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/network-testnet-f59e0b?style=flat-square" alt="Testnet">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License"></a>
