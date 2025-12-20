@@ -1,0 +1,36 @@
+version: "1.0"
+name: tauri-dev-session
+description: >
+  Launch Ikki in Tauri development mode with both frontend and Rust backend
+  running. Useful for end-to-end validation and manual UX review.
+maintainer: platform@ikki
+when_to_use:
+  - Validating flows that depend on Tauri IPC or the Rust backend.
+  - Capturing UI changes that require the packaged shell.
+tags: [devserver, tauri, e2e]
+prerequisites:
+  - command: "npm install"
+    reason: "Ensure JS dependencies are installed."
+  - command: "rustup --version"
+    reason: "Tauri requires Rust toolchain 1.81+."
+steps:
+  - description: Start the Tauri dev server.
+    command: |
+      npm run tauri dev
+    capture: [stdout, stderr]
+    notes:
+      - "This spawns a desktop window; leave it running while testing."
+  - description: If debugging backend output, raise log level.
+    command: |
+      RUST_LOG=debug npm run tauri dev
+    capture: [stdout, stderr]
+  - description: Collect screenshots when visual changes are present.
+    notes:
+      - "Use the MCP automation tools or OS-level capture."
+artifacts:
+  - name: tauri-dev-log
+    type: log
+    description: Console output while the dev server runs.
+references:
+  - path: README.md
+  - path: src-tauri/
