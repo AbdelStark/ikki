@@ -22,6 +22,7 @@ export interface Asset {
   name: string;
   decimals: number;
   icon?: string;
+  defuseAssetId?: string; // NEAR Intents asset ID
 }
 
 export interface SwapQuote {

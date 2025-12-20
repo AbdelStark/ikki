@@ -5,9 +5,17 @@ import type { Asset, SwapQuote } from '../types/swap';
 // ZEC asset identifier for SwapKit
 const ZEC_ASSET = 'ZEC.ZEC';
 
+// NEAR Intents API endpoint for token list
+const NEAR_INTENTS_TOKENS_API = 'https://api-mng-console.chaindefuser.com/api/tokens';
+
 // Mock mode for development (requires API key for real mode)
 // Set VITE_USE_MOCK_SWAPKIT=false and VITE_SWAPKIT_API_KEY=xxx to use real API
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
+
+// Cache for supported assets
+let cachedAssets: Asset[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // SwapKit API (imported dynamically)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,70 +100,119 @@ const mockSwapKit = {
 };
 
 /**
- * Get list of supported assets that can swap with ZEC
+ * Fetch assets from NEAR Intents API
  */
-export async function getSupportedAssets(): Promise<Asset[]> {
-  if (USE_MOCK) {
-    return mockSwapKit.getAssets();
-  }
-
+async function fetchNearIntentsAssets(): Promise<Asset[]> {
   try {
-    const api = await getSwapKitApi();
-
-    // Get token list from NEAR Intents provider (garden/near)
-    // We'll fetch from multiple providers to get a comprehensive list
-    const providers = await api.getTokenListProviders();
-    console.log('Available providers:', providers);
-
-    // Filter for relevant providers (NEAR Intents, THORChain, Chainflip)
-    const relevantProviders = ['thorswap', 'chainflip', 'garden'];
-    const assets: Asset[] = [];
-    const seenIdentifiers = new Set<string>();
-
-    for (const providerInfo of providers) {
-      if (!relevantProviders.includes(providerInfo.provider.toLowerCase())) continue;
-
-      try {
-        const tokenList = await api.getTokenList(providerInfo.provider);
-        for (const token of tokenList.tokens || []) {
-          // Skip ZEC itself and duplicates
-          if (token.identifier === ZEC_ASSET || seenIdentifiers.has(token.identifier)) continue;
-          seenIdentifiers.add(token.identifier);
-
-          // Map to our Asset type
-          assets.push({
-            chain: token.chain || token.identifier.split('.')[0],
-            symbol: token.symbol || token.ticker,
-            identifier: token.identifier,
-            name: token.name || token.ticker,
-            decimals: token.decimals,
-            icon: token.logoURI,
-          });
-        }
-      } catch (providerError) {
-        console.warn(`Failed to get tokens from ${providerInfo.provider}:`, providerError);
-      }
+    const response = await fetch(NEAR_INTENTS_TOKENS_API);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
+    const data = await response.json();
+    const items = data.items || [];
+
+    // Map NEAR Intents token format to our Asset type
+    const assets: Asset[] = items
+      .filter((token: { symbol: string }) => token.symbol !== 'ZEC') // Exclude ZEC itself
+      .map((token: {
+        defuse_asset_id: string;
+        symbol: string;
+        blockchain: string;
+        decimals: number;
+        price?: number;
+        contract_address?: string;
+      }) => {
+        // Build identifier in SwapKit format (CHAIN.SYMBOL or CHAIN.SYMBOL-CONTRACT)
+        const chain = mapBlockchainToChain(token.blockchain);
+        let identifier = `${chain}.${token.symbol}`;
+        if (token.contract_address && token.contract_address !== 'native') {
+          identifier = `${chain}.${token.symbol}-${token.contract_address}`;
+        }
+
+        return {
+          chain,
+          symbol: token.symbol,
+          identifier,
+          name: token.symbol, // API doesn't provide full name
+          decimals: token.decimals,
+          defuseAssetId: token.defuse_asset_id, // Keep original ID for NEAR Intents API
+        };
+      });
+
     // Sort by popular assets first
-    const popularAssets = ['BTC.BTC', 'ETH.ETH', 'SOL.SOL'];
+    const popularOrder = ['BTC', 'ETH', 'SOL', 'USDC', 'USDT', 'NEAR', 'ARB', 'MATIC', 'AVAX', 'DOT'];
     assets.sort((a, b) => {
-      const aPopular = popularAssets.indexOf(a.identifier);
-      const bPopular = popularAssets.indexOf(b.identifier);
-      if (aPopular >= 0 && bPopular >= 0) return aPopular - bPopular;
-      if (aPopular >= 0) return -1;
-      if (bPopular >= 0) return 1;
+      const aIdx = popularOrder.indexOf(a.symbol);
+      const bIdx = popularOrder.indexOf(b.symbol);
+      if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;
+      if (aIdx >= 0) return -1;
+      if (bIdx >= 0) return 1;
       return a.symbol.localeCompare(b.symbol);
     });
 
     return assets;
   } catch (error) {
-    console.error('Failed to get supported assets:', error);
-    // Return a static fallback list if API fails
+    console.error('Failed to fetch NEAR Intents assets:', error);
+    throw error;
+  }
+}
+
+/**
+ * Map NEAR Intents blockchain names to standard chain identifiers
+ */
+function mapBlockchainToChain(blockchain: string): string {
+  const mapping: Record<string, string> = {
+    'bitcoin': 'BTC',
+    'ethereum': 'ETH',
+    'solana': 'SOL',
+    'near': 'NEAR',
+    'arbitrum': 'ARB',
+    'base': 'BASE',
+    'polygon': 'MATIC',
+    'bsc': 'BSC',
+    'avalanche': 'AVAX',
+    'optimism': 'OP',
+    'sui': 'SUI',
+    'dogecoin': 'DOGE',
+    'litecoin': 'LTC',
+    'xrp': 'XRP',
+    'zcash': 'ZEC',
+    'aurora': 'AURORA',
+    'turbochain': 'TURBO',
+  };
+  return mapping[blockchain.toLowerCase()] || blockchain.toUpperCase();
+}
+
+/**
+ * Get list of supported assets that can swap with ZEC
+ * Fetches from NEAR Intents API with caching
+ */
+export async function getSupportedAssets(): Promise<Asset[]> {
+  // Check cache first
+  if (cachedAssets && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    return cachedAssets;
+  }
+
+  try {
+    // Try to fetch from NEAR Intents API (works in both mock and real mode)
+    const assets = await fetchNearIntentsAssets();
+    cachedAssets = assets;
+    cacheTimestamp = Date.now();
+    console.log(`Loaded ${assets.length} assets from NEAR Intents`);
+    return assets;
+  } catch (error) {
+    console.warn('Failed to fetch from NEAR Intents API, using fallback:', error);
+    // Fallback to static list if API fails
     return [
       { chain: 'BTC', symbol: 'BTC', identifier: 'BTC.BTC', name: 'Bitcoin', decimals: 8 },
       { chain: 'ETH', symbol: 'ETH', identifier: 'ETH.ETH', name: 'Ethereum', decimals: 18 },
       { chain: 'SOL', symbol: 'SOL', identifier: 'SOL.SOL', name: 'Solana', decimals: 9 },
+      { chain: 'NEAR', symbol: 'NEAR', identifier: 'NEAR.NEAR', name: 'NEAR Protocol', decimals: 24 },
+      { chain: 'ETH', symbol: 'USDC', identifier: 'ETH.USDC', name: 'USD Coin', decimals: 6 },
+      { chain: 'ETH', symbol: 'USDT', identifier: 'ETH.USDT', name: 'Tether', decimals: 6 },
+      { chain: 'DOGE', symbol: 'DOGE', identifier: 'DOGE.DOGE', name: 'Dogecoin', decimals: 8 },
+      { chain: 'LTC', symbol: 'LTC', identifier: 'LTC.LTC', name: 'Litecoin', decimals: 8 },
     ];
   }
 }
