@@ -18,13 +18,47 @@
     executeSwap,
   } from "../lib/services/swapkit";
   import type { SwapDirection } from "../lib/types/swap";
-  import { getSwapReceivingAddress } from "../lib/utils/tauri";
-  import type { Asset, ActiveSwap } from "../lib/types/swap";
+  import {
+    getSwapReceivingAddress,
+    sendTransactionBackground,
+    getPendingTransaction,
+    updateSwapStatus,
+    saveSwap,
+  } from "../lib/utils/tauri";
+  import type { Asset, ActiveSwap, SwapRecord } from "../lib/types/swap";
   import AssetSelector from "../lib/components/AssetSelector.svelte";
   import DepositPrompt from "../lib/components/DepositPrompt.svelte";
   import SwapStatus from "../lib/components/SwapStatus.svelte";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
+
+  // Convert ZEC amount (string) to zatoshis (integer)
+  function zecToZatoshis(zec: string): number {
+    const parsed = parseFloat(zec);
+    if (isNaN(parsed)) return 0;
+    return Math.round(parsed * 100_000_000);
+  }
+
+  // Poll for pending transaction completion
+  async function waitForTxBroadcast(pendingId: string, maxAttempts = 60): Promise<{ txid: string | null; error: string | null }> {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 1000)); // Wait 1 second between polls
+      const pending = await getPendingTransaction(pendingId);
+
+      if (!pending) {
+        return { txid: null, error: "Transaction not found" };
+      }
+
+      if (pending.status === "broadcast" && pending.txid) {
+        return { txid: pending.txid, error: null };
+      }
+
+      if (pending.status === "failed") {
+        return { txid: null, error: pending.error || "Transaction failed" };
+      }
+    }
+    return { txid: null, error: "Transaction timed out" };
+  }
 
   // Check if we're in mock mode
   const isMockMode = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
@@ -161,10 +195,13 @@
       const fromAmount = direction === "inbound" ? amount : $bestQuote.fromAmount;
       const toAmount = direction === "inbound" ? $bestQuote.toAmount : amount;
 
+      const swapId = crypto.randomUUID();
+      const now = Date.now();
+
       const newSwap: ActiveSwap = {
-        id: crypto.randomUUID(),
+        id: swapId,
         direction,
-        status: "awaiting_deposit",
+        status: direction === "crosspay" ? "building_tx" : "awaiting_deposit",
         fromAsset,
         fromAmount,
         toAsset,
@@ -175,14 +212,74 @@
         refundAddress: direction === "inbound" ? refundAddress : zecAddress.address,
         quoteHash: $bestQuote.quoteHash,
         intentHash: result.intentHash,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
+        createdAt: now,
+        expiresAt: now + 30 * 60 * 1000, // 30 minutes
       };
 
       swap.setActiveSwap(newSwap);
       phase = "deposit";
+
+      // For outbound swaps, send ZEC to the deposit address
+      if (direction === "crosspay" && result.depositAddress) {
+        // Save the swap record first
+        const swapRecord: SwapRecord = {
+          id: swapId,
+          direction,
+          status: "building_tx",
+          from_asset: fromAsset.identifier,
+          from_amount: fromAmount,
+          to_asset: toAsset.identifier,
+          to_amount: toAmount,
+          receiving_address: destinationAddress,
+          ephemeral_address: result.depositAddress,
+          refund_address: zecAddress.address,
+          recipient_address: destinationAddress,
+          quote_hash: $bestQuote.quoteHash,
+          intent_hash: result.intentHash,
+          created_at: Math.floor(now / 1000),
+          expires_at: Math.floor((now + 30 * 60 * 1000) / 1000),
+        };
+        await saveSwap(swapRecord);
+
+        // Convert ZEC amount to zatoshis and send
+        const zatoshis = zecToZatoshis(fromAmount);
+        if (zatoshis <= 0) {
+          throw new Error("Invalid ZEC amount");
+        }
+
+        ui.showToast("Building ZEC transaction...", "info");
+
+        // Update status to broadcasting
+        swap.updateSwapStatus("broadcasting_zec");
+        await updateSwapStatus(swapId, "broadcasting_zec");
+
+        // Send ZEC to the deposit address
+        const pendingTx = await sendTransactionBackground(
+          result.depositAddress,
+          zatoshis,
+          `NEAR Intents swap: ${toAmount} ${toAsset.symbol}`
+        );
+
+        ui.showToast("Broadcasting ZEC transaction...", "info");
+
+        // Wait for broadcast to complete
+        const txResult = await waitForTxBroadcast(pendingTx.id);
+
+        if (txResult.error) {
+          throw new Error(txResult.error);
+        }
+
+        if (txResult.txid) {
+          // Update swap with ZEC txid
+          swap.updateZcashTxid(txResult.txid);
+          await updateSwapStatus(swapId, "zec_confirmed", undefined, txResult.txid);
+          ui.showToast("ZEC sent! Waiting for swap fulfillment...", "success");
+        }
+      }
     } catch (error) {
       ui.showToast(`Failed to start swap: ${error}`, "error");
+      // Reset on failure
+      swap.updateSwapStatus("failed");
     } finally {
       confirmLoading = false;
     }
@@ -443,15 +540,57 @@
 
     {:else if phase === "deposit" && $activeSwap}
       <div class="deposit-phase">
-        <DepositPrompt
-          quote={$bestQuote!}
-          depositAddress={$activeSwap.depositAddress ?? ""}
-          fromAmount={$activeSwap.fromAmount}
-          fromSymbol={$activeSwap.fromAsset.symbol}
-          toAmount={$activeSwap.toAmount}
-          toSymbol="ZEC"
-          onCancel={reset}
-        />
+        {#if direction === "inbound"}
+          <!-- Inbound: Show deposit address for user to send external asset -->
+          <DepositPrompt
+            quote={$bestQuote!}
+            depositAddress={$activeSwap.depositAddress ?? ""}
+            fromAmount={$activeSwap.fromAmount}
+            fromSymbol={$activeSwap.fromAsset.symbol}
+            toAmount={$activeSwap.toAmount}
+            toSymbol="ZEC"
+            onCancel={reset}
+          />
+        {:else}
+          <!-- Outbound: Show ZEC sending progress -->
+          <div class="outbound-progress">
+            <h2>Sending ZEC</h2>
+            <div class="progress-summary">
+              <div class="progress-from">
+                <span class="progress-amount">{$activeSwap.fromAmount}</span>
+                <span class="progress-symbol">ZEC</span>
+              </div>
+              <div class="progress-arrow">→</div>
+              <div class="progress-to">
+                <span class="progress-amount">{$activeSwap.toAmount}</span>
+                <span class="progress-symbol">{$activeSwap.toAsset.symbol}</span>
+              </div>
+            </div>
+            <p class="progress-hint">
+              {#if $activeSwap.status === "building_tx"}
+                Building transaction...
+              {:else if $activeSwap.status === "broadcasting_zec"}
+                Broadcasting to Zcash network...
+              {:else if $activeSwap.status === "zec_confirmed"}
+                ZEC sent! Waiting for {$activeSwap.toAsset.symbol} to arrive...
+              {:else if $activeSwap.status === "fulfilling"}
+                Swap in progress...
+              {:else if $activeSwap.status === "completed"}
+                Swap complete!
+              {:else if $activeSwap.status === "failed"}
+                Swap failed
+              {:else}
+                Processing...
+              {/if}
+            </p>
+            {#if $activeSwap.zcashTxid}
+              <div class="txid-display">
+                <span class="txid-label">ZEC Txid:</span>
+                <code class="txid-value">{$activeSwap.zcashTxid.slice(0, 16)}...</code>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <SwapStatus
           status={$activeSwap.status}
@@ -460,7 +599,7 @@
 
         <div class="form-actions">
           <Button variant="ghost" size="lg" fullWidth onclick={reset}>
-            Cancel
+            {$activeSwap.status === "completed" || $activeSwap.status === "failed" ? "Done" : "Cancel"}
           </Button>
         </div>
       </div>
@@ -754,5 +893,80 @@
 
   .detail-row span:last-child {
     color: var(--text-primary);
+  }
+
+  /* Outbound swap progress */
+  .outbound-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .outbound-progress h2 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .progress-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .progress-from,
+  .progress-to {
+    text-align: center;
+  }
+
+  .progress-amount {
+    display: block;
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+  }
+
+  .progress-symbol {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+  }
+
+  .progress-arrow {
+    font-size: var(--text-xl);
+    color: var(--text-tertiary);
+  }
+
+  .progress-hint {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    margin: 0;
+  }
+
+  .txid-display {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+  }
+
+  .txid-label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  .txid-value {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
   }
 </style>

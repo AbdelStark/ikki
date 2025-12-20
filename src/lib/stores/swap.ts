@@ -50,6 +50,14 @@ function createSwapStore() {
     clearActiveSwap: () =>
       update((s) => ({ ...s, activeSwap: null })),
 
+    updateZcashTxid: (txid: string) =>
+      update((s) => ({
+        ...s,
+        activeSwap: s.activeSwap
+          ? { ...s.activeSwap, zcashTxid: txid }
+          : null,
+      })),
+
     // Assets
     setSupportedAssets: (assets: Asset[]) =>
       update((s) => ({ ...s, supportedAssets: assets })),
