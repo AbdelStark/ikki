@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Build iOS simulator bundle
-        run: npm run tauri:ios:build -- --debug --target aarch64-apple-ios-sim
+        run: npm run tauri:ios:build -- --debug --target aarch64-sim
 
       - name: Upload iOS simulator artifact
         uses: actions/upload-artifact@v4

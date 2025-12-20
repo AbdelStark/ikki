@@ -65,7 +65,7 @@ Hot reload is not available; Tauri performs incremental builds for the Rust core
 GitHub Actions workflows live in `.github/workflows/` to exercise the mobile pipelines:
 
 - `android-packages.yml` provisions the Android SDK/NDK, initializes the Tauri mobile project if needed, builds a debug APK (`npm run tauri:android:build -- --debug --apk true --aab false`), and uploads it as an artifact for sideloading.
-- `ios-packages.yml` targets the iOS simulator on `macos-14`, initializes the project if missing, builds a debug bundle for `aarch64-apple-ios-sim`, and publishes the `.app` bundle as an artifact.
+- `ios-packages.yml` targets the iOS simulator on `macos-14`, initializes the project if missing, builds a debug bundle for the simulator architecture (`--target aarch64-sim`), and publishes the `.app` bundle as an artifact.
 - For signed release artifacts, add the appropriate keystores or Apple signing assets as encrypted secrets and extend the workflows with the signing flags required by each platform.
 - The Android workflow installs NDK `25.2.9519653` via `sdkmanager` to avoid relying on third-party actions; update the version there if you need newer toolchains.
 
