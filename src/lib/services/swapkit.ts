@@ -134,7 +134,15 @@ const mockSwapKit = {
  */
 async function fetchNearIntentsAssets(): Promise<Asset[]> {
   try {
-    const response = await fetch(NEAR_INTENTS_TOKENS_API);
+    // Add timeout to prevent hanging (3 seconds - fast fallback if CORS blocks it)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
+    const response = await fetch(NEAR_INTENTS_TOKENS_API, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -214,18 +222,40 @@ function mapBlockchainToChain(blockchain: string): string {
   return mapping[blockchain.toLowerCase()] || blockchain.toUpperCase();
 }
 
+// Static fallback assets
+const FALLBACK_ASSETS: Asset[] = [
+  { chain: 'BTC', symbol: 'BTC', identifier: 'BTC.BTC', name: 'Bitcoin', decimals: 8 },
+  { chain: 'ETH', symbol: 'ETH', identifier: 'ETH.ETH', name: 'Ethereum', decimals: 18 },
+  { chain: 'SOL', symbol: 'SOL', identifier: 'SOL.SOL', name: 'Solana', decimals: 9 },
+  { chain: 'NEAR', symbol: 'NEAR', identifier: 'NEAR.NEAR', name: 'NEAR Protocol', decimals: 24 },
+  { chain: 'ARB', symbol: 'ARB', identifier: 'ARB.ARB', name: 'Arbitrum', decimals: 18 },
+  { chain: 'ETH', symbol: 'USDC', identifier: 'ETH.USDC-0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', name: 'USD Coin', decimals: 6 },
+  { chain: 'ETH', symbol: 'USDT', identifier: 'ETH.USDT-0xdAC17F958D2ee523a2206206994597C13D831ec7', name: 'Tether', decimals: 6 },
+  { chain: 'DOGE', symbol: 'DOGE', identifier: 'DOGE.DOGE', name: 'Dogecoin', decimals: 8 },
+  { chain: 'LTC', symbol: 'LTC', identifier: 'LTC.LTC', name: 'Litecoin', decimals: 8 },
+  { chain: 'AVAX', symbol: 'AVAX', identifier: 'AVAX.AVAX', name: 'Avalanche', decimals: 18 },
+];
+
 /**
  * Get list of supported assets that can swap with ZEC
  * Fetches from NEAR Intents API with caching
  */
 export async function getSupportedAssets(): Promise<Asset[]> {
+  console.log('getSupportedAssets called, USE_MOCK:', USE_MOCK);
+
+  // In mock mode or dev, use fallback assets directly (avoids CORS issues)
+  // For testing, always return fallback immediately
+  console.log('Returning fallback assets:', FALLBACK_ASSETS.length);
+  return FALLBACK_ASSETS;
+
+  /* Disabled for now due to CORS issues in Tauri webview
   // Check cache first
   if (cachedAssets && Date.now() - cacheTimestamp < CACHE_DURATION) {
     return cachedAssets;
   }
 
   try {
-    // Try to fetch from NEAR Intents API (works in both mock and real mode)
+    // Try to fetch from NEAR Intents API
     const assets = await fetchNearIntentsAssets();
     cachedAssets = assets;
     cacheTimestamp = Date.now();
@@ -234,18 +264,11 @@ export async function getSupportedAssets(): Promise<Asset[]> {
   } catch (error) {
     console.warn('Failed to fetch from NEAR Intents API, using fallback:', error);
     // Fallback to static list if API fails
-    return [
-      { chain: 'BTC', symbol: 'BTC', identifier: 'BTC.BTC', name: 'Bitcoin', decimals: 8 },
-      { chain: 'ETH', symbol: 'ETH', identifier: 'ETH.ETH', name: 'Ethereum', decimals: 18 },
-      { chain: 'SOL', symbol: 'SOL', identifier: 'SOL.SOL', name: 'Solana', decimals: 9 },
-      { chain: 'NEAR', symbol: 'NEAR', identifier: 'NEAR.NEAR', name: 'NEAR Protocol', decimals: 24 },
-      { chain: 'ETH', symbol: 'USDC', identifier: 'ETH.USDC', name: 'USD Coin', decimals: 6 },
-      { chain: 'ETH', symbol: 'USDT', identifier: 'ETH.USDT', name: 'Tether', decimals: 6 },
-      { chain: 'DOGE', symbol: 'DOGE', identifier: 'DOGE.DOGE', name: 'Dogecoin', decimals: 8 },
-      { chain: 'LTC', symbol: 'LTC', identifier: 'LTC.LTC', name: 'Litecoin', decimals: 8 },
-    ];
+    return FALLBACK_ASSETS;
   }
+  */
 }
+
 
 /**
  * Get quotes for inbound swap (external asset → ZEC)

@@ -11,6 +11,11 @@ use state::AppState;
 use crate::swap::db::open_swap_db;
 
 pub fn run() {
+    // Initialize rustls crypto provider (required before any TLS operations)
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
