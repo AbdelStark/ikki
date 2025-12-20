@@ -298,9 +298,10 @@ export async function getCrossPayQuotes(
 export async function executeSwap(
   quote: SwapQuote,
   params: {
-    sourceAddress: string; // ZEC transparent address for deposits
+    sourceAddress: string; // ZEC address for CrossPay source
     destinationAddress: string; // Destination address for receiving funds
-    refundAddress?: string;
+    sourceChainRefundAddress?: string; // Refund address on source chain (BTC, ETH, etc.)
+    zecRefundAddress: string; // Shielded ZEC address for any ZEC-side refunds
   }
 ): Promise<{ intentHash: string; depositAddress: string }> {
   if (USE_MOCK) {
@@ -344,6 +345,9 @@ export async function executeSwap(
         slippage: nearMeta.slippage || 3,
         destinationAddress: params.destinationAddress,
         sourceAddress: params.sourceAddress,
+        // Refund addresses
+        refundAddress: params.sourceChainRefundAddress, // Source chain refund
+        zecRefundAddress: params.zecRefundAddress, // ZEC-side refund (shielded)
       });
 
       console.log('NEAR deposit channel result:', result);

@@ -108,7 +108,8 @@
       const result = await executeSwap($bestQuote, {
         sourceAddress: address.address, // ZEC address (used for CrossPay, not inbound)
         destinationAddress: address.address, // ZEC address where user receives funds
-        refundAddress: refundAddress || undefined,
+        sourceChainRefundAddress: refundAddress || undefined, // User's address on source chain
+        zecRefundAddress: address.address, // Always use shielded unified address for ZEC refunds
       });
 
       const newSwap: ActiveSwap = {
@@ -222,15 +223,15 @@
 
         <div class="form-section">
           <Input
-            label="Refund address"
-            placeholder={`Your ${selectedAsset?.symbol || ""} address`}
+            label={`${selectedAsset?.symbol || "Source"} refund address`}
+            placeholder={`Your ${selectedAsset?.symbol || ""} wallet address`}
             value={refundAddress}
             oninput={(e) => (refundAddress = e.currentTarget.value)}
           />
           <div class="refund-warning">
             <AlertTriangle size={14} />
             <p>
-              <strong>Important:</strong> If the swap fails, funds will be returned to this address.
+              <strong>Important:</strong> If the swap fails, your {selectedAsset?.symbol || "funds"} will be returned to this address.
               Without a refund address, failed swaps may result in lost funds.
             </p>
           </div>
