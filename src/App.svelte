@@ -26,6 +26,7 @@
   import Contacts from "./routes/Contacts.svelte";
   import Onboarding from "./routes/Onboarding.svelte";
   import TransactionDetail from "./routes/TransactionDetail.svelte";
+  import Price from "./routes/Price.svelte";
 
   // Components
   import Toast from "./lib/components/Toast.svelte";
@@ -287,6 +288,8 @@
         <Contacts />
       {:else if $currentView === "transaction-detail"}
         <TransactionDetail />
+      {:else if $currentView === "price"}
+        <Price />
       {/if}
     </div>
 

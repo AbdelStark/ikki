@@ -9,6 +9,7 @@
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
+  import PriceSparkline from "../lib/components/PriceSparkline.svelte";
 
   // Use global transactions store
   $: recentTransactions = $transactions;
@@ -104,6 +105,10 @@
       />
     </div>
 
+    <div class="animate-price">
+      <PriceSparkline />
+    </div>
+
     <div class="actions animate-actions">
       <ActionButton variant="send" onclick={() => ui.navigate("send")} />
       <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
@@ -185,9 +190,15 @@
     opacity: 0;
   }
 
+  .animate-price {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.12s;
+    opacity: 0;
+  }
+
   .animate-actions {
     animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: 0.15s;
+    animation-delay: 0.18s;
     opacity: 0;
   }
 
