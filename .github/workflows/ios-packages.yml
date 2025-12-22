@@ -1,0 +1,79 @@
+name: iOS Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ios-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "src-tauri/**"
+      - "vite.config.ts"
+      - "svelte.config.js"
+  pull_request:
+    paths:
+      - ".github/workflows/ios-packages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "src-tauri/**"
+      - "vite.config.ts"
+      - "svelte.config.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build iOS package (simulator)
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-apple-ios,
+            aarch64-apple-ios-sim,
+            x86_64-apple-ios
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Initialize iOS project (if needed)
+        run: |
+          if [ ! -d src-tauri/gen/ios ]; then
+            npm run tauri:ios:init -- --ci
+          fi
+
+      - name: Build iOS simulator bundle
+        run: npm run tauri:ios:build -- --debug --target aarch64-sim
+
+      - name: Upload iOS simulator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-debug
+          path: |
+            src-tauri/gen/ios/target/**/bundle/**/*.app
+          if-no-files-found: warn

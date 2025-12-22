@@ -96,6 +96,21 @@ npm run tauri build
 
 Artifacts are written to `src-tauri/target/release/`.
 
+#### Mobile (Android & iOS)
+
+Ikki can be packaged with Tauri Mobile for native distribution:
+
+- Android init/dev/build: `npm run tauri:android:init`, `npm run tauri:android:dev`, `npm run tauri:android:build`
+- iOS init/dev/build: `npm run tauri:ios:init`, `npm run tauri:ios:dev`, `npm run tauri:ios:build`
+
+See [docs/mobile-packaging.md](docs/mobile-packaging.md) for full prerequisites, signing, and store distribution steps.
+
+### CI packaging
+
+- Desktop bundles (Linux, macOS, Windows): `.github/workflows/desktop-packages.yml`
+- Android debug APK: `.github/workflows/android-packages.yml`
+- iOS simulator debug bundle: `.github/workflows/ios-packages.yml`
+
 ### Minimal troubleshooting
 
 - If builds fail on macOS or Windows, re-run the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and restart your shell.
