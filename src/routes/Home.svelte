@@ -35,6 +35,8 @@
     <div class="actions">
       <ActionButton variant="send" onclick={() => ui.navigate("send")} />
       <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
+      <ActionButton variant="buy" disabled />
+      <ActionButton variant="swap" disabled />
     </div>
 
     <section class="recent-section">
@@ -158,7 +160,7 @@
   .actions {
     display: flex;
     justify-content: center;
-    gap: var(--space-10);
+    gap: var(--space-4);
   }
 
   .recent-section {

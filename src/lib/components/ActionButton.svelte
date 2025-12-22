@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { ArrowUp, ArrowDown } from "lucide-svelte";
+  import { ArrowUp, ArrowDown, CreditCard, ArrowLeftRight } from "lucide-svelte";
 
-  export let variant: "send" | "receive" = "send";
+  export let variant: "send" | "receive" | "buy" | "swap" = "send";
   export let onclick: () => void = () => {};
   export let disabled: boolean = false;
 
   const config = {
     send: { icon: ArrowUp, label: "Send" },
     receive: { icon: ArrowDown, label: "Receive" },
+    buy: { icon: CreditCard, label: "Buy" },
+    swap: { icon: ArrowLeftRight, label: "Swap" },
   };
 
   $: Icon = config[variant].icon;
@@ -18,6 +20,8 @@
   class="action-button"
   class:send={variant === "send"}
   class:receive={variant === "receive"}
+  class:buy={variant === "buy"}
+  class:swap={variant === "swap"}
   {disabled}
   {onclick}
 >
@@ -131,6 +135,22 @@
     box-shadow:
       0 8px 20px rgba(0, 0, 0, 0.4),
       0 0 20px rgba(34, 197, 94, 0.08);
+  }
+
+  /* Buy variant hover - subtle blue tint */
+  .action-button.buy:not(:disabled):hover .icon-bg {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(59, 130, 246, 0.08);
+  }
+
+  /* Swap variant hover - subtle purple tint */
+  .action-button.swap:not(:disabled):hover .icon-bg {
+    border-color: rgba(168, 85, 247, 0.3);
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(168, 85, 247, 0.08);
   }
 
   .action-label {
