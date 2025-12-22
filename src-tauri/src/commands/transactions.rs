@@ -76,8 +76,14 @@ pub async fn send_transaction(
 /// Get transaction history
 #[tauri::command]
 pub async fn get_transactions(state: State<'_, AppState>) -> Result<Vec<Transaction>, String> {
-    let wallet_lock = state.wallet.lock().await;
-    let wallet = wallet_lock.as_ref().ok_or("Wallet not initialized")?;
+    let mut wallet_lock = state.wallet.lock().await;
+    let wallet = wallet_lock.as_mut().ok_or("Wallet not initialized")?;
+
+    // Get current block height to calculate confirmations
+    let current_height = wallet
+        .get_block_height()
+        .await
+        .unwrap_or(0) as u32;
 
     // Get recent transactions from the wallet
     let records = wallet
@@ -87,23 +93,36 @@ pub async fn get_transactions(state: State<'_, AppState>) -> Result<Vec<Transact
     // Convert to frontend format
     let transactions: Vec<Transaction> = records
         .into_iter()
-        .map(|r| Transaction {
-            txid: r.txid,
-            tx_type: if r.is_sent {
-                TransactionType::Sent
+        .map(|r| {
+            // Calculate actual confirmations based on mined height
+            let confirmations = if let Some(mined_height) = r.mined_height {
+                if current_height >= mined_height {
+                    current_height - mined_height + 1
+                } else {
+                    0
+                }
             } else {
-                TransactionType::Received
-            },
-            amount: r.amount,
-            timestamp: r.timestamp,
-            address: None,
-            memo: r.memo,
-            status: if r.is_pending {
-                TransactionStatus::Pending
-            } else {
-                TransactionStatus::Confirmed
-            },
-            confirmations: if r.is_pending { 0 } else { 1 },
+                0
+            };
+
+            Transaction {
+                txid: r.txid,
+                tx_type: if r.is_sent {
+                    TransactionType::Sent
+                } else {
+                    TransactionType::Received
+                },
+                amount: r.amount,
+                timestamp: r.timestamp,
+                address: None,
+                memo: r.memo,
+                status: if r.is_pending {
+                    TransactionStatus::Pending
+                } else {
+                    TransactionStatus::Confirmed
+                },
+                confirmations,
+            }
         })
         .collect();
 

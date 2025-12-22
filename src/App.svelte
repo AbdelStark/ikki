@@ -37,8 +37,13 @@
   let showInitialSync = false;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let pendingTxPollInterval: ReturnType<typeof setInterval> | null = null;
+  let confirmationPollInterval: ReturnType<typeof setInterval> | null = null;
   // Track which transactions we've already shown completion toasts for
   let acknowledgedTxIds = new Set<string>();
+  // Track txids waiting for confirmation (broadcast but not yet mined)
+  let awaitingConfirmation = new Map<string, { txid: string; amount: number }>();
+  // Track if sync is in initial phase for post-sync actions
+  let currentSyncIsInitial = false;
 
   // Load transactions into global store
   async function refreshTransactions() {
@@ -55,12 +60,13 @@
   async function handleWalletReady() {
     showInitialSync = true;
     ui.setNeedsOnboarding(false);
+    currentSyncIsInitial = true;
 
     // Start the initial sync
     try {
       sync.startSync(true);
       await startBackgroundSync(true);
-      // Start polling for completion
+      // Start fallback polling (reduced frequency since events handle updates)
       startPolling(true);
     } catch (e) {
       console.error("Failed to start initial sync:", e);
@@ -69,15 +75,45 @@
     }
   }
 
-  // Poll for sync status and completion
+  // Handle sync completion (called from event listener or polling)
+  async function handleSyncComplete(isInitial: boolean) {
+    stopPolling();
+
+    try {
+      const balance = await getBalance();
+      wallet.updateBalance(balance);
+    } catch (e) {
+      console.error("Failed to fetch balance after sync:", e);
+    }
+
+    // Refresh transactions after sync
+    await refreshTransactions();
+
+    sync.completeSync();
+
+    if (isInitial) {
+      // Wait a moment to show 100% then dismiss
+      setTimeout(() => {
+        showInitialSync = false;
+        currentSyncIsInitial = false;
+      }, 1500);
+    } else {
+      ui.showToast("Wallet synced", "success");
+    }
+  }
+
+  // Fallback polling for sync status (reduced frequency - events are primary)
+  // Polling interval: 2s normally, 500ms during initial sync for responsiveness
   function startPolling(isInitial: boolean) {
     if (pollInterval) clearInterval(pollInterval);
+
+    const pollIntervalMs = isInitial ? 500 : 2000;
 
     pollInterval = setInterval(async () => {
       try {
         const status = await getSyncStatus();
 
-        // Update progress
+        // Update progress (events may already handle this, but poll as fallback)
         if (status.is_syncing) {
           sync.updateProgress({
             currentBlock: status.current_block,
@@ -87,37 +123,16 @@
             status: status.percentage > 0 ? "Syncing..." : "Connecting to network...",
           });
         } else {
-          // Sync completed - fetch balance, transactions and complete
-          stopPolling();
-
-          try {
-            const balance = await getBalance();
-            wallet.updateBalance(balance);
-          } catch (e) {
-            console.error("Failed to fetch balance after sync:", e);
-          }
-
-          // Refresh transactions after sync
-          await refreshTransactions();
-
-          sync.completeSync();
-
-          if (isInitial) {
-            // Wait a moment to show 100% then dismiss
-            setTimeout(() => {
-              showInitialSync = false;
-            }, 1500);
-          } else {
-            ui.showToast("Wallet synced successfully", "success");
-          }
+          // Sync completed
+          await handleSyncComplete(currentSyncIsInitial);
         }
       } catch (e) {
         console.error("Failed to poll sync status:", e);
       }
-    }, 500);
+    }, pollIntervalMs);
 
-    // Safety timeout - stop polling after 5 minutes
-    setTimeout(() => stopPolling(), 300000);
+    // Safety timeout - stop polling after 10 minutes
+    setTimeout(() => stopPolling(), 600000);
   }
 
   function stopPolling() {
@@ -151,8 +166,15 @@
                 wallet.updateBalance(balance);
                 await refreshTransactions();
 
+                // Track this transaction for confirmation polling
+                if (tx.txid) {
+                  awaitingConfirmation.set(tx.id, { txid: tx.txid, amount: tx.amount });
+                  startConfirmationPolling();
+                }
+
                 // Trigger a background sync to ensure wallet state is fully updated
                 // This helps catch the transaction confirmation and update final balance
+                currentSyncIsInitial = false;
                 sync.startSync(false);
                 await startBackgroundSync(false);
                 startPolling(false);
@@ -196,7 +218,94 @@
     }
   }
 
+  // Start polling for transaction confirmations
+  // This runs periodic syncs until all awaited transactions are confirmed
+  function startConfirmationPolling() {
+    if (confirmationPollInterval) return;
+
+    // Initial delay before first check (give time for tx to be mined)
+    const INITIAL_DELAY = 30000; // 30 seconds
+    const POLL_INTERVAL = 60000; // 60 seconds between syncs
+
+    let initialDelayPassed = false;
+
+    confirmationPollInterval = setInterval(async () => {
+      // Skip if no transactions awaiting confirmation
+      if (awaitingConfirmation.size === 0) {
+        stopConfirmationPolling();
+        return;
+      }
+
+      // Wait for initial delay before first sync
+      if (!initialDelayPassed) {
+        initialDelayPassed = true;
+        return;
+      }
+
+      // Skip if already syncing
+      if ($isSyncingStore) return;
+
+      try {
+        // Trigger a background sync
+        currentSyncIsInitial = false;
+        sync.startSync(false);
+        await startBackgroundSync(false);
+
+        // After sync, check if any awaited transactions are now confirmed
+        await refreshTransactions();
+
+        const txs = $transactionsStore.transactions;
+        for (const [pendingId, { txid, amount }] of awaitingConfirmation.entries()) {
+          const confirmedTx = txs.find(t => t.txid === txid && t.confirmations > 0);
+          if (confirmedTx) {
+            // Transaction is confirmed!
+            awaitingConfirmation.delete(pendingId);
+            ui.showToast(`Transaction confirmed (${confirmedTx.confirmations} conf)`, "success");
+
+            // Refresh balance
+            try {
+              const balance = await getBalance();
+              wallet.updateBalance(balance);
+            } catch (e) {
+              console.error("Failed to refresh balance after confirmation:", e);
+            }
+          }
+        }
+
+        // Stop polling if all transactions confirmed
+        if (awaitingConfirmation.size === 0) {
+          stopConfirmationPolling();
+        }
+      } catch (e) {
+        console.error("Failed to check transaction confirmations:", e);
+      }
+    }, POLL_INTERVAL);
+
+    // Also do an immediate check after the initial delay
+    setTimeout(async () => {
+      if (awaitingConfirmation.size === 0) return;
+
+      try {
+        currentSyncIsInitial = false;
+        sync.startSync(false);
+        await startBackgroundSync(false);
+      } catch (e) {
+        console.error("Failed to start initial confirmation sync:", e);
+      }
+    }, INITIAL_DELAY);
+  }
+
+  function stopConfirmationPolling() {
+    if (confirmationPollInterval) {
+      clearInterval(confirmationPollInterval);
+      confirmationPollInterval = null;
+    }
+  }
+
   onMount(async () => {
+    // Setup sync event listeners for reactive updates
+    await sync.setupEventListeners();
+
     pricing.start();
     try {
       const exists = await checkWalletExists();
@@ -248,6 +357,8 @@
   onDestroy(() => {
     stopPolling();
     stopPendingTxPolling();
+    stopConfirmationPolling();
+    sync.cleanupEventListeners();
     pricing.stop();
   });
 
