@@ -617,11 +617,8 @@ export async function executeSwap(
   }
 }
 
-// NEAR Intents Explorer API for status tracking
-const NEAR_INTENTS_EXPLORER_API = 'https://explorer.near-intents.org/api/v0';
-
 /**
- * Get swap status from NEAR Intents Explorer API
+ * Get swap status from NEAR Intents 1Click API
  * @param depositAddress - The deposit address from the quote
  * @param intentHash - Optional intent hash (correlation ID)
  */
@@ -637,41 +634,26 @@ export async function getSwapStatus(depositAddress: string, intentHash?: string)
   }
 
   try {
-    // Query NEAR Intents Explorer API by deposit address
-    const searchParam = depositAddress || intentHash;
-    if (!searchParam) {
+    if (!depositAddress) {
       return { status: 'UNKNOWN' };
     }
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (NEAR_INTENTS_API_KEY) {
-      headers['Authorization'] = `Bearer ${NEAR_INTENTS_API_KEY}`;
-    }
-
-    const response = await fetch(
-      `${NEAR_INTENTS_EXPLORER_API}/transactions?search=${encodeURIComponent(searchParam)}`,
-      { headers }
+    // Use 1Click API status endpoint with query parameter
+    const response = await nearIntentsApiFetch(
+      `/v0/status?depositAddress=${encodeURIComponent(depositAddress)}`
     );
 
     if (!response.ok) {
-      console.error('Explorer API error:', response.status);
+      // 404 means swap not found yet - could be pending deposit
+      if (response.status === 404) {
+        return { status: 'PENDING' };
+      }
+      console.error('Status API error:', response.status);
       return { status: 'UNKNOWN' };
     }
 
     const data = await response.json();
-    console.log('Explorer API response:', data);
-
-    // Find the matching transaction
-    const transactions = data.transactions || data.items || [];
-    if (transactions.length === 0) {
-      // No transaction found yet - still pending deposit
-      return { status: 'PENDING' };
-    }
-
-    // Get the most recent transaction for this deposit address
-    const tx = transactions[0];
+    console.log('Status API response:', data);
 
     // Map NEAR Intents status to our simplified format
     const statusMap: Record<string, string> = {
@@ -683,12 +665,16 @@ export async function getSwapStatus(depositAddress: string, intentHash?: string)
       'FAILED': 'FAILED',
     };
 
+    // Extract transaction hash from destination chain
+    const destTxHashes = data.swapDetails?.destinationChainTxHashes || [];
+    const txHash = destTxHashes.length > 0 ? destTxHashes[0].hash : undefined;
+
     return {
-      status: statusMap[tx.status] || 'UNKNOWN',
-      txHash: tx.depositTxHash || tx.txHash,
-      fromAmount: tx.amountIn || tx.fromAmount,
-      toAmount: tx.amountOut || tx.toAmount,
-      error: tx.status === 'FAILED' ? tx.errorMessage || 'Transaction failed' : undefined,
+      status: statusMap[data.status] || 'UNKNOWN',
+      txHash,
+      fromAmount: data.swapDetails?.amountInFormatted,
+      toAmount: data.swapDetails?.amountOutFormatted,
+      error: data.status === 'FAILED' ? data.swapDetails?.refundReason || 'Transaction failed' : undefined,
     };
   } catch (error) {
     console.error('Failed to get swap status:', error);
