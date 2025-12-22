@@ -9,7 +9,7 @@
 <h4 align="center">A privacy-first Zcash wallet with a premium mobile experience.</h4>
 
 <p align="center">
-  <a href="https://github.com/AbdelStark/ikki/releases"><img src="https://img.shields.io/github/v/release/AbdelStark/ikki?style=flat-square&color=8b5cf6" alt="Release"></a>
+  <a href="https://github.com/AbdelStark/ikki/actions/workflows/ci.yml"><img src="https://github.com/AbdelStark/ikki/actions/workflows/ci.yml/badge.svg?branch=main&style=flat-square" alt="CI"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/network-testnet-f59e0b?style=flat-square" alt="Testnet">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License"></a>
@@ -20,16 +20,24 @@
   <a href="#screenshots">Screenshots</a> •
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#architecture">Architecture</a>
+  <a href="#architecture">Architecture</a> •
+  <a href="#development">Development</a> •
+  <a href="#security">Security</a>
 </p>
 
 ---
 
 ## Why Ikki
 
-Ikki combines the privacy guarantees of Zcash with the polish of a modern consumer app. Built with Tauri and Svelte, it delivers native performance with a beautiful dark interface designed for mobile-first interactions.
+Ikki combines the privacy guarantees of Zcash with a modern consumer-grade experience. Built with Tauri and Svelte, it delivers native performance, responsive layouts, and a dark interface designed for uninterrupted mobile-first usage.
 
-> **Note:** Testnet only. Do not use with real funds.
+> **Status:** Testnet only. Do not use with real funds.
+
+### What Ikki delivers
+
+- Confidence: shielded transactions by default with unified addresses.
+- Clarity: focused flows for sending, receiving, and reviewing history.
+- Responsiveness: lightwalletd-backed sync with optimistic balance updates.
 
 ## Screenshots
 
@@ -47,22 +55,21 @@ Ikki combines the privacy guarantees of Zcash with the polish of a modern consum
 ## Features
 
 **Wallet**
-- HD wallet with BIP-39 24-word seed phrases
-- Unified addresses (Orchard + Sapling shielded pools)
-- Diversified addresses for unlinkable payments
-- Fast sync via lightwalletd compact blocks
+- BIP-39 24-word seed phrases with HD derivation
+- Unified addresses spanning Orchard and Sapling
+- Diversified addresses to keep payments unlinkable
+- Fast sync using lightwalletd compact blocks
 
 **Privacy**
-- Shielded by default — all transactions use Orchard/Sapling
-- 512-byte encrypted memo support
-- Zero analytics or telemetry
+- Shielded-only transactions by design
+- 512-byte encrypted memos
+- No analytics or telemetry hooks
 
 **Experience**
-- Premium dark theme with careful attention to detail
+- Premium dark theme tuned for readability
 - QR code scanning and generation
-- Real-time background sync with progress indication
+- Real-time background sync with progress and optimistic balances
 - Transaction history grouped by date
-- Optimistic balance updates for pending transactions
 
 ## Quick Start
 
@@ -70,9 +77,9 @@ Ikki combines the privacy guarantees of Zcash with the polish of a modern consum
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://rustup.rs/) 1.81+
-- [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
+- [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your platform
 
-### Run
+### Local run
 
 ```bash
 git clone https://github.com/AbdelStark/ikki.git
@@ -81,13 +88,19 @@ npm install
 npm run tauri dev
 ```
 
-### Build
+### Production build
 
 ```bash
 npm run tauri build
 ```
 
-Output: `src-tauri/target/release/`
+Artifacts are written to `src-tauri/target/release/`.
+
+### Minimal troubleshooting
+
+- If builds fail on macOS or Windows, re-run the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and restart your shell.
+- Ensure Rust toolchain is up to date: `rustup update stable`.
+- Delete `src-tauri/target` when changing Rust toolchains to avoid stale artifacts.
 
 ## Architecture
 
@@ -160,7 +173,7 @@ ikki/
 └── public/                 # Static assets
 ```
 
-### Commands
+### Core scripts
 
 ```bash
 npm run dev          # Vite dev server
@@ -169,9 +182,9 @@ npm run tauri dev    # Development mode
 npm run tauri build  # Production build
 ```
 
-### MCP Server for Claude Code
+### MCP server for Claude Code
 
-An MCP (Model Context Protocol) server is included for UI automation with Claude Code. It enables screenshot capture, clicking, and typing within the Ikki app window.
+Ikki ships an MCP (Model Context Protocol) server for UI automation. It allows screenshot capture, clicking, and typing within the app window.
 
 **Setup:**
 
@@ -213,7 +226,7 @@ Or add to `.mcp.json` manually:
 - macOS with Accessibility and Screen Recording permissions granted to your terminal
 - The Ikki app must be running (`npm run tauri dev` or production build)
 
-### Key Files
+### Key files
 
 | Frontend | Purpose |
 |----------|---------|
@@ -235,10 +248,10 @@ Or add to `.mcp.json` manually:
 - File permissions `0600` (Unix)
 - TLS for all lightwalletd connections
 
-**Best practices:**
-1. Back up your seed phrase offline
-2. Use testnet only
-3. Verify addresses before sending
+**Operational tips:**
+1. Back up your seed phrase offline.
+2. Use testnet only.
+3. Verify addresses before sending.
 
 **Reset wallet:**
 ```bash
@@ -251,18 +264,18 @@ rm -rf ~/.ikki/
 |----------|---------|-------------|
 | `RUST_LOG` | `info` | Log level |
 
-Server: `testnet.zec.rocks:443` (configurable in `wallet/config.rs`)
+Server: `testnet.zec.rocks:443` (configurable in `wallet/config.rs`).
 
 ## Contributing
 
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/xyz`)
-3. Commit changes
-4. Push and open a PR
+1. Fork the repo.
+2. Create a branch (`git checkout -b feature/xyz`).
+3. Commit changes.
+4. Push and open a PR.
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 

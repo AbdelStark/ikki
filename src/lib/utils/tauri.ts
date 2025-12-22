@@ -178,6 +178,10 @@ export async function cancelSync(): Promise<void> {
   return invoke<void>("cancel_sync");
 }
 
+export async function resetSyncState(): Promise<void> {
+  return invoke<void>("reset_sync_state");
+}
+
 // Sync event listeners (kept for potential future use, but polling is primary)
 export function onSyncProgress(
   callback: (progress: SyncProgress) => void

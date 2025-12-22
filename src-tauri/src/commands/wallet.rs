@@ -485,6 +485,14 @@ pub async fn cancel_sync(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
+/// Force reset sync state (for recovery from stuck states)
+#[tauri::command]
+pub async fn reset_sync_state(state: State<'_, AppState>) -> Result<(), String> {
+    info!("Force resetting sync state");
+    state.sync_state.end_sync();
+    Ok(())
+}
+
 /// Run the background sync with progress updates
 async fn run_background_sync(
     wallet: Arc<tokio::sync::Mutex<Option<IkkiWallet>>>,

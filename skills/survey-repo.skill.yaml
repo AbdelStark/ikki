@@ -1,0 +1,47 @@
+version: "1.0"
+name: survey-repo
+description: >
+  Structured reconnaissance pass for new Ikki tasks. Reads agent guides,
+  maps key directories, and captures immediate risks before coding.
+maintainer: platform@ikki
+when_to_use:
+  - On first contact with the repository.
+  - Before estimating or planning a feature or bugfix.
+tags: [discovery, context, safety]
+prerequisites:
+  - command: "find"
+    reason: "Locate `AGENTS.md` files."
+  - command: "rg"
+    reason: "Fast search; preferred over recursive grep."
+steps:
+  - description: Locate all agent instructions.
+    command: |
+      find . -name "AGENTS.md" -print
+    capture: [stdout]
+  - description: Read top-level guides.
+    notes:
+      - "Open `AGENTS.md` and `docs/agents/README.md`."
+      - "Skim `docs/agents/skills/INDEX.md` to see existing skills."
+  - description: Check project overview.
+    command: |
+      sed -n '1,200p' README.md
+    capture: [stdout]
+  - description: Map key directories.
+    notes:
+      - "Frontend: `src/` (components, stores, routes)."
+      - "Backend: `src-tauri/` (commands, wallet logic)."
+      - "Automation: `tools/ikki-mcp/`."
+  - description: Identify risky areas.
+    notes:
+      - "Check for security-sensitive paths (wallet, seed handling)."
+      - "Confirm there are no platform-specific constraints."
+  - description: Summarize findings.
+    output: "Short bullet list covering instructions, key files, and potential hazards."
+artifacts:
+  - name: survey-notes
+    type: text
+    description: Optional scratchpad of observations and follow-up questions.
+references:
+  - path: AGENTS.md
+  - path: docs/agents/README.md
+  - path: docs/agents/skills/INDEX.md

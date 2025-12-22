@@ -71,6 +71,25 @@ export function formatBlockHeight(height: number): string {
 }
 
 /**
+ * Format fiat currency amounts
+ */
+export function formatFiat(amount: number, currency: string = "USD"): string {
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Mask an amount for privacy mode
+ */
+export function maskedAmount(maskChar = "*", length = 4): string {
+  return maskChar.repeat(length);
+}
+
+/**
  * Copy text to clipboard
  */
 export async function copyToClipboard(text: string): Promise<boolean> {

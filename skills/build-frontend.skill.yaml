@@ -1,0 +1,30 @@
+version: "1.0"
+name: build-frontend
+description: >
+  Run the Vite production build to ensure the Svelte frontend compiles and
+  to surface TypeScript or bundling errors early.
+maintainer: platform@ikki
+when_to_use:
+  - Before submitting changes that touch `src/` or `public/`.
+  - As a quick health check after dependency updates.
+tags: [build, qa, frontend]
+prerequisites:
+  - command: "npm install"
+    reason: "Dependencies must be installed."
+steps:
+  - description: Execute the Vite build.
+    command: |
+      npm run build
+    capture: [stdout, stderr]
+  - description: Review build artifacts (optional).
+    notes:
+      - "Inspect `dist/` for generated assets if debugging."
+  - description: Capture summary for status reports.
+    output: "Last 20 lines of the build log."
+artifacts:
+  - name: frontend-build-log
+    type: log
+    description: Output from `npm run build`.
+references:
+  - path: package.json
+  - path: AGENTS.md

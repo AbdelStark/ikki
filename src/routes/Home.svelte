@@ -1,34 +1,122 @@
 <script lang="ts">
+  import { Settings, RefreshCw } from "lucide-svelte";
   import { wallet, balance, address } from "../lib/stores/wallet";
-  import { sync, isSyncing } from "../lib/stores/sync";
+  import { sync, isSyncing, syncProgress } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
   import { transactions, transactionsLoaded } from "../lib/stores/transactions";
   import { totalPendingAmount } from "../lib/stores/pendingTransactions";
-  import { type Transaction } from "../lib/utils/tauri";
+  import { startBackgroundSync, getSyncStatus, getBalance } from "../lib/utils/tauri";
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
+  import PriceSparkline from "../lib/components/PriceSparkline.svelte";
 
   // Use global transactions store
   $: recentTransactions = $transactions;
   $: loading = !$transactionsLoaded;
+
+  let syncPollInterval: ReturnType<typeof setInterval> | null = null;
+
+  async function handleSync() {
+    if ($isSyncing) return;
+
+    try {
+      sync.startSync(false);
+      await startBackgroundSync(false);
+      pollSyncStatus();
+    } catch (e) {
+      sync.setError(String(e));
+      ui.showToast(`Failed to start sync: ${e}`, "error");
+    }
+  }
+
+  function pollSyncStatus() {
+    if (syncPollInterval) clearInterval(syncPollInterval);
+
+    syncPollInterval = setInterval(async () => {
+      try {
+        const status = await getSyncStatus();
+
+        if (status.is_syncing) {
+          sync.updateProgress({
+            currentBlock: status.current_block,
+            targetBlock: status.target_block,
+            percentage: status.percentage,
+            isFirstSync: status.is_first_sync,
+            status: status.percentage > 0 ? "Syncing..." : "Connecting...",
+          });
+        } else {
+          if (syncPollInterval) clearInterval(syncPollInterval);
+          syncPollInterval = null;
+
+          try {
+            const newBalance = await getBalance();
+            wallet.updateBalance(newBalance);
+          } catch (e) {
+            console.error("Failed to fetch balance after sync:", e);
+          }
+
+          sync.completeSync();
+          ui.showToast("Wallet synced", "success");
+        }
+      } catch (e) {
+        console.error("Failed to poll sync status:", e);
+        if (syncPollInterval) clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 500);
+
+    setTimeout(() => {
+      if (syncPollInterval) {
+        clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 300000);
+  }
 </script>
 
-<div class="home">
-  <div class="home-content">
-    <AccountCard
-      balance={$balance}
-      address={$address}
-      syncing={$isSyncing ?? false}
-      pendingAmount={$totalPendingAmount}
-    />
+<div class="home noise-overlay">
+  <header class="home-header">
+    <div class="header-spacer"></div>
+    <span class="header-title">ikki</span>
+    <div class="header-actions">
+      <button
+        class="header-btn"
+        class:syncing={$isSyncing}
+        onclick={handleSync}
+        disabled={$isSyncing}
+        aria-label="Sync wallet"
+      >
+        <RefreshCw size={18} strokeWidth={1.5} />
+      </button>
+      <button class="header-btn" onclick={() => ui.navigate("settings")} aria-label="Settings">
+        <Settings size={18} strokeWidth={1.5} />
+      </button>
+    </div>
+  </header>
 
-    <div class="actions">
-      <ActionButton variant="send" onclick={() => ui.navigate("send")} />
-      <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
+  <div class="home-content">
+    <div class="animate-card">
+      <AccountCard
+        balance={$balance}
+        address={$address}
+        syncing={$isSyncing ?? false}
+        pendingAmount={$totalPendingAmount}
+      />
     </div>
 
-    <section class="recent-section">
+    <div class="animate-price">
+      <PriceSparkline />
+    </div>
+
+    <div class="actions animate-actions">
+      <ActionButton variant="send" onclick={() => ui.navigate("send")} />
+      <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
+      <ActionButton variant="buy" disabled />
+      <ActionButton variant="swap" disabled />
+    </div>
+
+    <section class="recent-section animate-section">
       <div class="section-header">
         <h3>Recent Activity</h3>
         {#if recentTransactions.length > 0}
@@ -86,23 +174,120 @@
 <style>
   .home {
     min-height: 100%;
-    padding: var(--space-5);
-    padding-bottom: calc(var(--nav-height) + var(--space-4));
-    animation: fadeIn var(--duration-normal) var(--ease-out);
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+      180deg,
+      var(--bg-primary) 0%,
+      rgba(8, 8, 10, 1) 100%
+    );
+  }
+
+  /* Staggered entrance animations */
+  .animate-card {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.05s;
+    opacity: 0;
+  }
+
+  .animate-price {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.12s;
+    opacity: 0;
+  }
+
+  .animate-actions {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.18s;
+    opacity: 0;
+  }
+
+  .animate-section {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.25s;
+    opacity: 0;
+  }
+
+  .home-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-5);
+    max-width: var(--max-width);
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .header-spacer {
+    width: 72px;
+  }
+
+  .header-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-bold);
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .header-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .header-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .header-btn:active:not(:disabled) {
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .header-btn:disabled {
+    cursor: default;
+  }
+
+  .header-btn.syncing {
+    color: var(--text-secondary);
+  }
+
+  .header-btn.syncing :global(svg) {
+    animation: spin 1s linear infinite;
   }
 
   .home-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
     max-width: var(--max-width);
     margin: 0 auto;
+    padding: 0 var(--space-5) var(--space-6);
+    width: 100%;
   }
 
   .actions {
     display: flex;
     justify-content: center;
-    gap: var(--space-10);
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
   }
 
   .recent-section {
@@ -115,61 +300,70 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-2);
   }
 
   .section-header h3 {
-    font-size: var(--text-2xs);
+    font-size: 10px;
     font-weight: var(--font-semibold);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: var(--tracking-widest);
+    letter-spacing: 0.12em;
   }
 
   .see-all {
     background: none;
     border: none;
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
     font-weight: var(--font-medium);
     cursor: pointer;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    transition:
-      color var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out);
-    letter-spacing: var(--tracking-wide);
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    letter-spacing: 0.02em;
   }
 
   .see-all:hover {
-    color: var(--text-secondary);
-    background: var(--bg-hover);
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .see-all:active {
+    transform: scale(0.95);
   }
 
   .transaction-list {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 15, 17, 0.6) 0%,
+      rgba(12, 12, 14, 0.8) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     overflow: hidden;
     position: relative;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .transaction-list::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 10%;
-    right: 10%;
+    left: 5%;
+    right: 5%;
     height: 1px;
     background: linear-gradient(90deg,
       transparent,
-      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.08),
       transparent
     );
+    pointer-events: none;
   }
 
   .transaction-list > :global(*:not(:last-child)) {
-    border-bottom: 1px solid var(--divider);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .loading-state {
@@ -235,24 +429,30 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-12) var(--space-4);
+    padding: var(--space-14) var(--space-4);
     text-align: center;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 15, 17, 0.5) 0%,
+      rgba(12, 12, 14, 0.7) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .empty-icon {
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     margin-bottom: var(--space-4);
-    opacity: 0.3;
+    opacity: 0.25;
+    animation: softPulse 3s ease-in-out infinite;
   }
 
   .empty-title {
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
-    color: var(--text-primary);
+    color: var(--text-secondary);
     margin-bottom: var(--space-1);
+    letter-spacing: -0.01em;
   }
 
   .empty-subtitle {

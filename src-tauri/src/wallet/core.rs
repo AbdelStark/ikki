@@ -68,6 +68,8 @@ pub struct TransactionRecord {
     pub memo: Option<String>,
     /// Whether this transaction is pending (unmined)
     pub is_pending: bool,
+    /// Block height where transaction was mined (None if pending)
+    pub mined_height: Option<u32>,
 }
 
 type IkkiWalletDb =
@@ -519,6 +521,7 @@ impl IkkiWallet {
                 is_sent,
                 memo,
                 is_pending,
+                mined_height,
             });
         }
 

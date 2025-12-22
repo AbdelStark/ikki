@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { RefreshCw, Check, X } from "lucide-svelte";
-  import { sync, isSyncing, syncProgress, syncError } from "../stores/sync";
+  import { RefreshCw, Check, X, XCircle } from "lucide-svelte";
+  import { sync, isSyncing, syncProgress, syncError, syncMetrics, syncETA, syncMode, syncElapsed } from "../stores/sync";
   import { slide, fade } from "svelte/transition";
 
   export let compact: boolean = false;
@@ -9,6 +9,18 @@
   $: percentage = progress?.percentage ?? 0;
   $: error = $syncError;
   $: isIndeterminate = percentage < 5 || percentage > 95;
+  $: metrics = $syncMetrics;
+  $: eta = $syncETA;
+  $: mode = $syncMode;
+  $: elapsed = $syncElapsed;
+  $: blocksRemaining = metrics?.blocksRemaining ?? 0;
+  $: hasDetailedProgress = !isIndeterminate && blocksRemaining > 0;
+  // Show elapsed time if syncing for more than 10 seconds without detailed progress
+  $: showElapsed = !hasDetailedProgress && (metrics?.elapsedSeconds ?? 0) > 10;
+
+  function handleCancel() {
+    sync.forceReset("Sync cancelled");
+  }
 </script>
 
 {#if $isSyncing || error}
@@ -41,12 +53,33 @@
           <RefreshCw size={14} class="spin" />
         </div>
         <div class="indicator-text">
-          <span class="indicator-label">Syncing</span>
+          <span class="indicator-label">
+            {#if mode === "catchup"}
+              Catching up
+            {:else if mode === "incremental"}
+              Syncing
+            {:else}
+              Syncing
+            {/if}
+          </span>
+          {#if hasDetailedProgress && eta}
+            <span class="indicator-eta">{eta}</span>
+          {:else if showElapsed && elapsed}
+            <span class="indicator-eta">{elapsed}</span>
+          {/if}
         </div>
         {#if !compact}
-          <div class="progress-bar-container" class:indeterminate={isIndeterminate}>
-            <div class="progress-bar" class:indeterminate={isIndeterminate} style="width: {isIndeterminate ? '30%' : percentage + '%'}"></div>
+          <div class="progress-section">
+            <div class="progress-bar-container" class:indeterminate={isIndeterminate}>
+              <div class="progress-bar" class:indeterminate={isIndeterminate} style="width: {isIndeterminate ? '30%' : percentage + '%'}"></div>
+            </div>
+            {#if hasDetailedProgress}
+              <span class="progress-percent">{Math.round(percentage)}%</span>
+            {/if}
           </div>
+          <button class="cancel-btn" onclick={handleCancel} title="Cancel sync">
+            <XCircle size={14} />
+          </button>
         {/if}
       {/if}
     </div>
@@ -130,10 +163,33 @@
     color: var(--text-primary);
   }
 
+  .indicator-eta {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    padding-left: var(--space-1);
+    border-left: 1px solid var(--border);
+    margin-left: var(--space-1);
+  }
+
   .indicator-progress {
     font-size: var(--text-2xs);
     color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
+  }
+
+  .progress-section {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .progress-percent {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+    text-align: right;
   }
 
   .progress-bar-container {
@@ -191,6 +247,27 @@
   .dismiss-btn:hover {
     color: var(--text-primary);
     background: var(--bg-hover);
+  }
+
+  .cancel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    transition: all var(--duration-fast) var(--ease-out);
+    opacity: 0.5;
+  }
+
+  .cancel-btn:hover {
+    color: var(--error);
+    background: var(--error-muted);
+    opacity: 1;
   }
 
   .compact .indicator-icon {

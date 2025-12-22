@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { syncProgress, isSyncing, syncError } from "../stores/sync";
+  import { syncProgress, isSyncing, syncError, syncMetrics, syncETA, syncMode } from "../stores/sync";
 
   // Cypherpunk quotes - inspiring messages from the pioneers
   const quotes = [
@@ -119,6 +119,13 @@
   $: currentQuote = shuffledQuotes[currentQuoteIndex];
   $: error = $syncError;
   $: syncing = $isSyncing;
+  $: metrics = $syncMetrics;
+  $: eta = $syncETA;
+  $: mode = $syncMode;
+
+  // Format blocks per second for display
+  $: blocksPerSecond = metrics?.blocksPerSecond ?? 0;
+  $: hasMetrics = blocksPerSecond > 0 && percentage >= 5;
 </script>
 
 <div class="initial-sync">
@@ -175,6 +182,20 @@
           {#if progress.targetBlock > 0 && percentage >= 5}
             <div class="progress-blocks">
               Block {progress.currentBlock.toLocaleString()} of {progress.targetBlock.toLocaleString()}
+            </div>
+          {/if}
+          {#if hasMetrics}
+            <div class="progress-metrics">
+              {#if eta}
+                <span class="metric">
+                  <span class="metric-value">{eta}</span>
+                  <span class="metric-label">remaining</span>
+                </span>
+              {/if}
+              <span class="metric">
+                <span class="metric-value">{blocksPerSecond.toFixed(1)}</span>
+                <span class="metric-label">blocks/s</span>
+              </span>
             </div>
           {/if}
         {:else if syncing}
@@ -381,6 +402,36 @@
     color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
     letter-spacing: var(--tracking-wide);
+  }
+
+  .progress-metrics {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+
+  .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .metric-value {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-label {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   /* Quote Section */

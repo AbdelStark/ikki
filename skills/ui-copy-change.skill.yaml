@@ -1,0 +1,38 @@
+version: "1.0"
+name: ui-copy-change
+description: >
+  Safely update UI copy or visual tweaks in the Svelte frontend while keeping
+  wallet flows coherent and dark-theme friendly.
+maintainer: platform@ikki
+when_to_use:
+  - Editing text, labels, or simple layout details in `src/`.
+  - Updating icons or static assets in `public/`.
+tags: [ui, copy, frontend]
+prerequisites:
+  - command: "npm run build"
+    reason: "Ensure the baseline build passes before modifying UI."
+steps:
+  - description: Identify target component.
+    notes:
+      - "Routes live under `src/routes/`; shared UI lives in `src/lib/components/`."
+  - description: Update copy with context.
+    notes:
+      - "Keep privacy and security phrasing accurate for Zcash workflows."
+      - "Maintain concise, action-focused labels."
+  - description: Adjust styling if needed.
+    notes:
+      - "Check dark-theme contrast; avoid inline styles when possible."
+  - description: Run a build to catch TypeScript or Svelte errors.
+    command: |
+      npm run build
+    capture: [stdout, stderr]
+  - description: Capture before/after context for review.
+    notes:
+      - "Take screenshots when visuals change, using MCP tools if available."
+artifacts:
+  - name: copy-change-build-log
+    type: log
+    description: Output from the verification build.
+references:
+  - path: src/
+  - path: public/

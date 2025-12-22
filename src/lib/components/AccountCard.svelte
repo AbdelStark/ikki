@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { Copy, Check, RefreshCw, Shield, Shuffle, ArrowUpRight } from "lucide-svelte";
+  import { Copy, Check, RefreshCw, Shield, Shuffle, ArrowUpRight, Eye, EyeOff } from "lucide-svelte";
   import { ui } from "../stores/ui";
   import { wallet } from "../stores/wallet";
-  import { formatZec, truncateAddress, copyToClipboard } from "../utils/format";
+  import { hideAmounts, preferences } from "../stores/preferences";
+  import { zecUsdPrice, pricingLoading } from "../stores/pricing";
+  import { formatFiat, formatZec, maskedAmount, truncateAddress, copyToClipboard } from "../utils/format";
   import { getNewAddress } from "../utils/tauri";
 
   export let balance: number = 0;
@@ -36,10 +38,21 @@
     }
   }
 
+  function toggleBalanceVisibility() {
+    preferences.toggleHideAmounts();
+  }
+
+  $: isHidden = $hideAmounts;
   $: formattedBalance = formatZec(balance);
-  $: [intPart, decPart] = formattedBalance.includes('.')
-    ? formattedBalance.split('.')
-    : [formattedBalance, '00'];
+  $: [intPart, decPart] = isHidden
+    ? [maskedAmount(), maskedAmount("*", 2)]
+    : formattedBalance.includes('.')
+      ? formattedBalance.split('.')
+      : [formattedBalance, '00'];
+  $: formattedPending = isHidden ? maskedAmount() : formatZec(pendingAmount);
+  $: usdRate = $zecUsdPrice;
+  $: usdValue = usdRate ? (balance / 100_000_000) * usdRate : null;
+  $: formattedUsdValue = isHidden ? maskedAmount() : usdValue !== null ? formatFiat(usdValue) : null;
 </script>
 
 <div class="card">
@@ -64,15 +77,42 @@
 
     <!-- Balance display -->
     <div class="balance-section">
-      <div class="balance">
-        <span class="balance-int">{intPart}</span>
-        <span class="balance-dec">.{decPart}</span>
-        <span class="balance-unit">ZEC</span>
+      <div class="balance-container">
+        <div class="balance-glow"></div>
+        <div class="balance-row">
+          <div class="balance">
+            <span class="balance-int">{intPart}</span>
+            <span class="balance-dec">.{decPart}</span>
+            <span class="balance-unit">ZEC</span>
+          </div>
+          <button class="toggle-visibility" onclick={toggleBalanceVisibility} aria-label={isHidden ? "Show balances" : "Hide balances"}>
+            {#if isHidden}
+              <EyeOff size={16} strokeWidth={2.25} />
+            {:else}
+              <Eye size={16} strokeWidth={2.25} />
+            {/if}
+          </button>
+        </div>
+
+        <div class="fiat-row" class:muted={!formattedUsdValue}>
+          {#if formattedUsdValue}
+            <span class="fiat-value">{formattedUsdValue}</span>
+            {#if usdRate && !isHidden}
+              <span class="fiat-rate">@ ${usdRate.toFixed(2)}</span>
+            {/if}
+          {:else}
+            <span class="fiat-value">{isHidden ? maskedAmount() : "—"}</span>
+          {/if}
+          {#if $pricingLoading}
+            <span class="fiat-loading"></span>
+          {/if}
+        </div>
       </div>
+
       {#if pendingAmount > 0}
         <div class="pending-amount">
           <ArrowUpRight size={11} strokeWidth={2.5} />
-          <span>-{formatZec(pendingAmount)} ZEC pending</span>
+          <span>-{formattedPending} ZEC pending</span>
         </div>
       {/if}
     </div>
@@ -106,62 +146,82 @@
     position: relative;
     border-radius: var(--radius-2xl);
     overflow: hidden;
+    transform: translateZ(0);
+    will-change: transform;
   }
 
   .card-bg {
     position: absolute;
     inset: 0;
-    background: var(--bg-card);
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 22, 0.95) 0%,
+      rgba(12, 12, 14, 0.98) 100%
+    );
     border: 1px solid var(--border);
     border-radius: var(--radius-2xl);
+    transition: border-color 0.4s ease;
   }
 
-  /* Premium gradient overlay */
+  .card:hover .card-bg {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Premium gradient overlay - liquid metal effect */
   .card-bg::before {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.04) 0%,
-      rgba(255, 255, 255, 0.01) 30%,
-      transparent 60%
+      135deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.02) 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.01) 75%,
+      rgba(255, 255, 255, 0.03) 100%
     );
     border-radius: inherit;
     pointer-events: none;
   }
 
-  /* Top edge shine */
+  /* Top edge shine - enhanced */
   .card-bg::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 8%;
-    right: 8%;
+    left: 5%;
+    right: 5%;
     height: 1px;
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.15) 30%,
+      rgba(255, 255, 255, 0.15) 70%,
       transparent
     );
     pointer-events: none;
   }
 
-  /* Subtle ambient glow */
+  /* Subtle ambient glow - enhanced */
   .card-glow {
     position: absolute;
-    top: -50%;
+    top: -60%;
     left: 50%;
     transform: translateX(-50%);
-    width: 80%;
-    height: 100%;
+    width: 100%;
+    height: 120%;
     background: radial-gradient(
-      ellipse at center,
-      rgba(255, 255, 255, 0.03) 0%,
-      transparent 70%
+      ellipse 60% 40% at 50% 0%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 60%
     );
     pointer-events: none;
+    opacity: 0.8;
+    transition: opacity 0.4s ease;
+  }
+
+  .card:hover .card-glow {
+    opacity: 1;
   }
 
   .card-content {
@@ -214,8 +274,39 @@
   .balance-section {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     margin-bottom: var(--space-4);
+  }
+
+  .balance-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .balance-glow {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 60%;
+    height: 200%;
+    background: radial-gradient(
+      ellipse 100% 80% at 0% 50%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+    animation: glowPulse 4s ease-in-out infinite;
+  }
+
+  .balance-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
   }
 
   .balance {
@@ -224,28 +315,102 @@
   }
 
   .balance-int {
-    font-size: var(--text-2xl);
+    font-size: 2.5rem;
     font-weight: var(--font-bold);
     color: var(--text-primary);
-    letter-spacing: var(--tracking-tighter);
-    line-height: var(--leading-none);
+    letter-spacing: -0.035em;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
+    text-shadow:
+      0 0 60px rgba(255, 255, 255, 0.15),
+      0 0 30px rgba(255, 255, 255, 0.1);
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.85) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .balance-dec {
-    font-size: var(--text-lg);
+    font-size: 1.375rem;
     font-weight: var(--font-semibold);
     color: var(--text-muted);
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    opacity: 0.6;
   }
 
   .balance-unit {
-    font-size: var(--text-sm);
-    font-weight: var(--font-medium);
+    font-size: 10px;
+    font-weight: var(--font-bold);
     color: var(--text-muted);
-    margin-left: var(--space-2);
-    letter-spacing: var(--tracking-wide);
+    margin-left: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .toggle-visibility {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  .toggle-visibility:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--border-emphasis);
+    color: var(--text-secondary);
+  }
+
+  .toggle-visibility:active {
+    transform: scale(0.97);
+  }
+
+  .fiat-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+  }
+
+  .fiat-row.muted {
+    color: var(--text-tertiary);
+  }
+
+  .fiat-value {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .fiat-rate {
+    font-size: var(--text-2xs);
+    color: var(--text-muted);
+    font-weight: var(--font-normal);
+    letter-spacing: var(--tracking-normal);
+  }
+
+  .fiat-loading {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--text-muted);
+    animation: pulse 1.5s ease-in-out infinite;
+    opacity: 0.5;
   }
 
   .pending-amount {

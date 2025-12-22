@@ -6,7 +6,8 @@
   import { ui } from "../lib/stores/ui";
   import { pendingTransactions } from "../lib/stores/pendingTransactions";
   import { sendTransactionBackground } from "../lib/utils/tauri";
-  import { formatZec, parseZec, truncateAddress } from "../lib/utils/format";
+  import { hideAmounts } from "../lib/stores/preferences";
+  import { formatZec, maskedAmount, parseZec, truncateAddress } from "../lib/utils/format";
   import { detectChain, isZcashAddress } from "../lib/services/swapkit";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
@@ -95,11 +96,12 @@
 
   $: amountZatoshis = parseZec($sendAmount);
   $: totalWithFee = amountZatoshis + FEE;
+  $: isHidden = $hideAmounts;
   $: detectedChain = $sendAddress ? detectChain($sendAddress) : null;
   $: isCrossPay = detectedChain !== null && detectedChain !== 'zcash';
 </script>
 
-<div class="send">
+<div class="send noise-overlay">
   {#if $sendPhase !== "complete"}
     <header class="send-header">
       <button class="back-button" onclick={handleBack}>
@@ -115,7 +117,7 @@
       <div class="input-phase">
         <div class="balance-display">
           <span class="balance-label">Available</span>
-          <span class="balance-value">{formatZec($balance)} ZEC</span>
+          <span class="balance-value">{isHidden ? maskedAmount() : formatZec($balance)} ZEC</span>
         </div>
 
         <div class="form-section">
@@ -186,7 +188,7 @@
     {:else if $sendPhase === "preview"}
       <div class="preview-phase">
         <div class="preview-amount">
-          <span class="amount-value">{formatZec(amountZatoshis)}</span>
+          <span class="amount-value">{isHidden ? maskedAmount() : formatZec(amountZatoshis)}</span>
           <span class="amount-currency">ZEC</span>
         </div>
 
@@ -198,16 +200,16 @@
           <div class="preview-divider"></div>
           <div class="preview-row">
             <span class="preview-label">Amount</span>
-            <span class="preview-value">{formatZec(amountZatoshis)} ZEC</span>
+            <span class="preview-value">{isHidden ? maskedAmount() : formatZec(amountZatoshis)} ZEC</span>
           </div>
           <div class="preview-row">
             <span class="preview-label">Network fee</span>
-            <span class="preview-value secondary">{formatZec(FEE)} ZEC</span>
+            <span class="preview-value secondary">{isHidden ? maskedAmount() : formatZec(FEE)} ZEC</span>
           </div>
           <div class="preview-divider"></div>
           <div class="preview-row total">
             <span class="preview-label">Total</span>
-            <span class="preview-value">{formatZec(totalWithFee)} ZEC</span>
+            <span class="preview-value">{isHidden ? maskedAmount() : formatZec(totalWithFee)} ZEC</span>
           </div>
           {#if $sendMemo}
             <div class="preview-divider"></div>
@@ -285,53 +287,55 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--bg-primary);
+    background: linear-gradient(
+      180deg,
+      var(--bg-primary) 0%,
+      rgba(8, 8, 10, 1) 100%
+    );
   }
 
   .send-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-5);
-    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--space-4) var(--space-5);
+    animation: floatIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .back-button {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     cursor: pointer;
-    border-radius: var(--radius-md);
-    transition:
-      color var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+    border-radius: var(--radius-lg);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     -webkit-tap-highlight-color: transparent;
   }
 
   .back-button:hover {
     color: var(--text-primary);
-    background: var(--bg-hover);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .back-button:active {
-    transform: scale(0.95);
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .send-header h1 {
     font-size: var(--text-sm);
     font-weight: var(--font-semibold);
-    color: var(--text-primary);
-    letter-spacing: var(--tracking-wide);
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
   }
 
   .header-spacer {
-    width: 40px;
+    width: 36px;
   }
 
   .send-content {
@@ -340,7 +344,9 @@
     max-width: var(--max-width);
     margin: 0 auto;
     width: 100%;
-    animation: fadeIn var(--duration-normal) var(--ease-out);
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.1s;
+    opacity: 0;
   }
 
   /* Input Phase */
@@ -349,22 +355,50 @@
     flex-direction: column;
     gap: var(--space-6);
     min-height: 100%;
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.05s;
+    opacity: 0;
   }
 
   .balance-display {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-3) var(--space-4);
-    background: var(--bg-card);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
+    padding: var(--space-4);
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 22, 0.7) 0%,
+      rgba(15, 15, 17, 0.8) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .balance-display::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+    pointer-events: none;
   }
 
   .balance-label {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    letter-spacing: var(--tracking-wide);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .balance-value {
@@ -373,6 +407,8 @@
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
   }
 
   .form-section {
@@ -405,22 +441,26 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    padding: var(--space-1) var(--space-2);
-    background: none;
-    border: none;
+    padding: var(--space-1-5) var(--space-2-5);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     color: var(--text-secondary);
     font-size: var(--text-2xs);
     font-weight: var(--font-medium);
     cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition:
-      color var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out);
+    border-radius: var(--radius-md);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    -webkit-tap-highlight-color: transparent;
   }
 
   .contacts-link:hover {
     color: var(--text-primary);
-    background: var(--bg-hover);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .contacts-link:active {
+    transform: scale(0.95);
   }
 
   .selected-contact {
@@ -428,12 +468,17 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: var(--bg-elevated);
-    border-radius: var(--radius-sm);
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-size: var(--text-2xs);
     font-weight: var(--font-medium);
-    border: 1px solid var(--border);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    animation: fadeIn 0.3s ease;
   }
 
   .amount-input-wrapper {
@@ -445,31 +490,41 @@
     right: 12px;
     top: 50%;
     transform: translateY(20%);
-    padding: 5px 10px;
-    background: var(--bg-elevated);
-    color: var(--text-tertiary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
     font-size: 9px;
-    font-weight: var(--font-semibold);
+    font-weight: var(--font-bold);
     cursor: pointer;
-    transition:
-      background var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     letter-spacing: var(--tracking-widest);
     -webkit-tap-highlight-color: transparent;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .max-button:hover {
-    background: var(--text-primary);
-    color: var(--text-inverse);
-    border-color: var(--text-primary);
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.9) 100%
+    );
+    color: rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow:
+      0 4px 12px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
   .max-button:active {
-    transform: translateY(20%) scale(0.95);
+    transform: translateY(20%) scale(0.92);
   }
 
   .form-actions {
@@ -494,40 +549,77 @@
 
   .preview-amount {
     text-align: center;
-    padding: var(--space-6) 0 var(--space-4);
+    padding: var(--space-8) 0 var(--space-6);
+    position: relative;
+  }
+
+  .preview-amount::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 100px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 60%
+    );
+    pointer-events: none;
+    animation: glowPulse 3s ease-in-out infinite;
   }
 
   .amount-value {
-    font-size: var(--text-2xl);
+    font-size: 2.5rem;
     font-weight: var(--font-bold);
     color: var(--text-primary);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: -0.03em;
+    position: relative;
+    text-shadow:
+      0 0 40px rgba(255, 255, 255, 0.1),
+      0 0 20px rgba(255, 255, 255, 0.05);
   }
 
   .amount-currency {
-    font-size: var(--text-sm);
-    font-weight: var(--font-medium);
-    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--text-muted);
     margin-left: var(--space-2);
-    letter-spacing: var(--tracking-wider);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    position: relative;
   }
 
   .preview-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    padding: var(--space-4);
+    background: linear-gradient(
+      180deg,
+      rgba(18, 18, 20, 0.7) 0%,
+      rgba(12, 12, 14, 0.85) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: var(--space-5);
     position: relative;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
   }
 
   .preview-card::before {
     content: '';
     position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: var(--gradient-card);
+    top: 0;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.08),
+      transparent
+    );
     pointer-events: none;
   }
 
@@ -579,7 +671,12 @@
 
   .preview-divider {
     height: 1px;
-    background: var(--divider);
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 20%,
+      rgba(255, 255, 255, 0.06) 80%,
+      transparent 100%
+    );
     margin: var(--space-2) 0;
   }
 
@@ -593,23 +690,44 @@
     padding: var(--space-16) var(--space-4);
     gap: var(--space-4);
     min-height: 60vh;
-    animation: fadeIn var(--duration-normal) var(--ease-out);
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .status-icon {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: var(--space-2);
+    position: relative;
+  }
+
+  .status-icon::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: var(--radius-full);
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 70%
+    );
+    animation: glowPulse 3s ease-in-out infinite;
   }
 
   .status-icon.spinning {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      145deg,
+      rgba(25, 25, 28, 0.9) 0%,
+      rgba(18, 18, 20, 0.95) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.06);
     color: var(--text-secondary);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .status-icon.spinning :global(.spin) {
@@ -617,17 +735,31 @@
   }
 
   .status-icon.success {
-    background: var(--receive-muted);
-    border: 1px solid rgba(52, 211, 153, 0.2);
+    background: linear-gradient(
+      145deg,
+      rgba(52, 211, 153, 0.15) 0%,
+      rgba(52, 211, 153, 0.08) 100%
+    );
+    border: 1px solid rgba(52, 211, 153, 0.25);
     color: var(--receive);
     animation: scaleIn var(--duration-normal) var(--ease-spring);
+    box-shadow:
+      0 4px 20px rgba(52, 211, 153, 0.15),
+      inset 0 1px 0 rgba(52, 211, 153, 0.2);
   }
 
   .status-icon.processing {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      145deg,
+      rgba(25, 25, 28, 0.9) 0%,
+      rgba(18, 18, 20, 0.95) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.06);
     color: var(--text-secondary);
     animation: scaleIn var(--duration-normal) var(--ease-spring);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .processing-message {
@@ -642,19 +774,29 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    background: var(--bg-card);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
+    padding: var(--space-2-5) var(--space-4);
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 22, 0.8) 0%,
+      rgba(15, 15, 17, 0.9) 100%
+    );
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     margin-top: var(--space-2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .processing-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--text-tertiary);
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0.2) 100%
+    );
     animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
   }
 
   .processing-info span {
@@ -664,10 +806,17 @@
   }
 
   .status-icon.error {
-    background: var(--error-muted);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    background: linear-gradient(
+      145deg,
+      rgba(239, 68, 68, 0.15) 0%,
+      rgba(239, 68, 68, 0.08) 100%
+    );
+    border: 1px solid rgba(239, 68, 68, 0.25);
     color: var(--error);
     animation: scaleIn var(--duration-normal) var(--ease-spring);
+    box-shadow:
+      0 4px 20px rgba(239, 68, 68, 0.15),
+      inset 0 1px 0 rgba(239, 68, 68, 0.2);
   }
 
   .status-phase h2 {
@@ -675,6 +824,7 @@
     font-weight: var(--font-semibold);
     color: var(--text-primary);
     letter-spacing: var(--tracking-tight);
+    text-shadow: 0 0 30px rgba(255, 255, 255, 0.08);
   }
 
   .status-phase p {
@@ -688,17 +838,28 @@
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     color: var(--text-tertiary);
-    background: var(--bg-card);
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 22, 0.8) 0%,
+      rgba(15, 15, 17, 0.9) 100%
+    );
     padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     letter-spacing: var(--tracking-wide);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .error-text {
     color: var(--text-secondary);
     font-size: var(--text-xs);
     max-width: 280px;
+    line-height: var(--leading-relaxed);
+  }
+
+  /* Preview Phase Animation */
+  .preview-phase {
+    animation: floatIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   /* CrossPay Notice */

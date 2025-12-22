@@ -62,6 +62,7 @@ pub fn run() {
             commands::wallet::start_background_sync,
             commands::wallet::get_sync_status,
             commands::wallet::cancel_sync,
+            commands::wallet::reset_sync_state,
             // Transaction commands
             commands::transactions::send_transaction,
             commands::transactions::get_transactions,
