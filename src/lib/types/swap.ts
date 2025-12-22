@@ -33,7 +33,7 @@ export interface SwapQuote {
   feePercent: number;
   expiresAt: number;
   estimatedTime: number;
-  raw?: unknown; // Original quote object from SwapKit
+  raw?: unknown; // Original quote object from NEAR Intents API
 }
 
 export interface ActiveSwap {

@@ -17,7 +17,7 @@
     getCrossPayQuotes,
     executeSwap,
     getSwapStatus,
-  } from "../lib/services/swapkit";
+  } from "../lib/services/near-intents";
   import type { SwapDirection } from "../lib/types/swap";
   import {
     getSwapReceivingAddress,
@@ -62,7 +62,7 @@
   }
 
   // Check if we're in mock mode
-  const isMockMode = import.meta.env.VITE_USE_MOCK_SWAPKIT !== 'false' || !import.meta.env.VITE_SWAPKIT_API_KEY;
+  const isMockMode = import.meta.env.VITE_USE_MOCK_NEAR_INTENTS !== 'false' || !import.meta.env.VITE_NEAR_INTENTS_API_KEY;
 
   // Polling state
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
@@ -84,16 +84,16 @@
   }
 
   // Start polling for swap status
-  async function startStatusPolling(intentHash: string, swapId: string, swapDirection: SwapDirection) {
+  async function startStatusPolling(depositAddress: string, swapId: string, swapDirection: SwapDirection) {
     if (isPolling) return;
     isPolling = true;
     lastPolledStatus = '';
 
-    console.log('Starting status polling for intent:', intentHash);
+    console.log('Starting status polling for deposit address:', depositAddress);
 
     pollingInterval = setInterval(async () => {
       try {
-        const status = await getSwapStatus(intentHash);
+        const status = await getSwapStatus(depositAddress);
         console.log('Poll result:', status);
 
         // Only process if status changed
@@ -223,11 +223,15 @@
       let fetchedQuotes;
       if (direction === "inbound") {
         // External asset → ZEC
-        const address = await getSwapReceivingAddress(true);
+        // NEAR Intents only supports transparent addresses (t1...) for now, not unified addresses
+        const address = await getSwapReceivingAddress(false);
         fetchedQuotes = await getInboundQuotes(
           selectedAsset.identifier,
           amount,
-          address.address
+          address.address,
+          selectedAsset.defuseAssetId,
+          refundAddress, // Source chain refund address (e.g., ETH address for USDC swaps)
+          selectedAsset.decimals // Pass decimals for unit conversion
         );
       } else {
         // ZEC → External asset (CrossPay)
@@ -236,7 +240,8 @@
           selectedAsset.identifier,
           amount,
           destinationAddress,
-          zecAddress.address
+          zecAddress.address,
+          selectedAsset.defuseAssetId
         );
       }
       swap.setQuotes(fetchedQuotes);
@@ -330,7 +335,7 @@
         await saveSwap(swapRecord);
 
         // Start polling for deposit detection and swap progress
-        startStatusPolling(result.intentHash, swapId, direction);
+        startStatusPolling(result.depositAddress, swapId, direction);
       }
 
       // For outbound swaps, send ZEC to the deposit address
@@ -390,8 +395,8 @@
           ui.showToast("ZEC sent! Waiting for swap fulfillment...", "success");
 
           // Start polling for swap completion
-          if (result.intentHash) {
-            startStatusPolling(result.intentHash, swapId, direction);
+          if (result.depositAddress) {
+            startStatusPolling(result.depositAddress, swapId, direction);
           }
         }
       }
@@ -504,19 +509,7 @@
             </div>
           </div>
 
-          <div class="swap-arrow">
-            <RefreshCw size={20} />
-          </div>
-
-          <div class="form-section">
-            <div class="field-label">To</div>
-            <div class="to-display">
-              <span class="zec-badge">ZEC</span>
-              <span class="estimated">≈ {$bestQuote?.toAmount || "—"}</span>
-            </div>
-          </div>
-
-          <div class="form-section">
+          <div class="form-section refund-section">
             <Input
               label={`${selectedAsset?.symbol || "Source"} refund address`}
               placeholder={`Your ${selectedAsset?.symbol || ""} wallet address`}
@@ -529,6 +522,18 @@
                 <strong>Important:</strong> If the swap fails, your {selectedAsset?.symbol || "funds"} will be returned to this address.
                 Without a refund address, failed swaps may result in lost funds.
               </p>
+            </div>
+          </div>
+
+          <div class="swap-arrow">
+            <RefreshCw size={20} />
+          </div>
+
+          <div class="form-section">
+            <div class="field-label">To</div>
+            <div class="to-display">
+              <span class="zec-badge">ZEC</span>
+              <span class="estimated">≈ {$bestQuote?.toAmount || "—"}</span>
             </div>
           </div>
         {:else}

@@ -8,7 +8,7 @@
   import { sendTransactionBackground } from "../lib/utils/tauri";
   import { hideAmounts } from "../lib/stores/preferences";
   import { formatZec, maskedAmount, parseZec, truncateAddress } from "../lib/utils/format";
-  import { detectChain, isZcashAddress } from "../lib/services/swapkit";
+  import { detectChain, isZcashAddress } from "../lib/services/near-intents";
   import Button from "../lib/components/Button.svelte";
   import Input from "../lib/components/Input.svelte";
 
