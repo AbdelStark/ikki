@@ -315,7 +315,11 @@
   {:else}
     <!-- Normal Settings View -->
     <header class="settings-header">
+      <button class="back-btn" onclick={() => ui.navigate("home")} aria-label="Back to home">
+        <ArrowLeft size={20} strokeWidth={1.5} />
+      </button>
       <h1>Settings</h1>
+      <div class="header-spacer"></div>
     </header>
 
     <div class="settings-content">
@@ -472,21 +476,53 @@
   }
 
   .settings-header {
-    padding: var(--space-5);
-    padding-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-5);
+    gap: var(--space-3);
   }
 
   .settings-header h1 {
-    font-size: var(--text-lg);
+    flex: 1;
+    font-size: var(--text-base);
     font-weight: var(--font-semibold);
     color: var(--text-primary);
     letter-spacing: var(--tracking-tight);
+    text-align: center;
+  }
+
+  .settings-header .header-spacer {
+    width: 36px;
+  }
+
+  .settings-header .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    flex-shrink: 0;
+  }
+
+  .settings-header .back-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .settings-header .back-btn:active {
+    transform: scale(0.92);
   }
 
   .settings-content {
     flex: 1;
-    padding: 0 var(--space-5) var(--space-5);
-    padding-bottom: calc(var(--nav-height) + var(--space-4));
+    padding: 0 var(--space-5) var(--space-6);
     display: flex;
     flex-direction: column;
     gap: var(--space-6);

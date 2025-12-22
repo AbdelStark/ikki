@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Loader2, Search, SlidersHorizontal, X, ChevronDown, ArrowUpDown } from "lucide-svelte";
+  import { Loader2, Search, SlidersHorizontal, X, ChevronDown, ArrowUpDown, ArrowLeft } from "lucide-svelte";
+  import { ui } from "../lib/stores/ui";
   import { type Transaction } from "../lib/utils/tauri";
   import { pendingTxList } from "../lib/stores/pendingTransactions";
   import { transactions as txStore, transactionsLoading, transactionsLoaded } from "../lib/stores/transactions";
@@ -154,9 +155,14 @@
 
 <div class="history">
   <header class="history-header">
+    <button class="back-btn" onclick={() => ui.navigate("home")} aria-label="Back to home">
+      <ArrowLeft size={20} strokeWidth={1.5} />
+    </button>
     <h1>Activity</h1>
     {#if visibleCount > 0}
       <span class="tx-count">{visibleCount}</span>
+    {:else}
+      <div class="header-spacer"></div>
     {/if}
   </header>
 
@@ -173,7 +179,7 @@
             aria-label="Search transactions"
           />
           {#if searchQuery.length > 0}
-            <button class="clear-search" on:click={() => (searchQuery = "")} aria-label="Clear search">
+            <button class="clear-search" onclick={() => (searchQuery = "")} aria-label="Clear search">
               <X size={14} />
             </button>
           {/if}
@@ -182,7 +188,7 @@
         <button
           class="filter-toggle"
           class:active={filtersExpanded || activeFilterCount > 0}
-          on:click={() => filtersExpanded = !filtersExpanded}
+          onclick={() => filtersExpanded = !filtersExpanded}
           aria-label="Toggle filters"
           aria-expanded={filtersExpanded}
         >
@@ -199,7 +205,7 @@
           <div class="filters-header">
             <span class="filters-title">Filters & Sort</span>
             {#if activeFilterCount > 0}
-              <button class="clear-filters" on:click={clearAllFilters}>
+              <button class="clear-filters" onclick={clearAllFilters}>
                 Clear all
               </button>
             {/if}
@@ -212,7 +218,7 @@
                 <button
                   class="filter-chip"
                   class:active={typeFilter === option.value}
-                  on:click={() => (typeFilter = option.value)}
+                  onclick={() => (typeFilter = option.value)}
                 >
                   {option.label}
                 </button>
@@ -227,7 +233,7 @@
                 <button
                   class="filter-chip"
                   class:active={statusFilter === option.value}
-                  on:click={() => (statusFilter = option.value)}
+                  onclick={() => (statusFilter = option.value)}
                 >
                   {option.label}
                 </button>
@@ -245,7 +251,7 @@
                 <button
                   class="filter-chip"
                   class:active={sortOption === option.value}
-                  on:click={() => (sortOption = option.value)}
+                  onclick={() => (sortOption = option.value)}
                 >
                   {option.label}
                 </button>
@@ -261,19 +267,19 @@
           {#if typeFilter !== "all"}
             <span class="active-tag">
               {typeOptions.find(o => o.value === typeFilter)?.label}
-              <button on:click={() => typeFilter = "all"}><X size={10} /></button>
+              <button onclick={() => typeFilter = "all"}><X size={10} /></button>
             </span>
           {/if}
           {#if statusFilter !== "all"}
             <span class="active-tag">
               {statusOptions.find(o => o.value === statusFilter)?.label}
-              <button on:click={() => statusFilter = "all"}><X size={10} /></button>
+              <button onclick={() => statusFilter = "all"}><X size={10} /></button>
             </span>
           {/if}
           {#if sortOption !== "newest"}
             <span class="active-tag">
               {sortOptions.find(o => o.value === sortOption)?.label}
-              <button on:click={() => sortOption = "newest"}><X size={10} /></button>
+              <button onclick={() => sortOption = "newest"}><X size={10} /></button>
             </span>
           {/if}
         </div>
@@ -376,15 +382,41 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-5);
-    padding-bottom: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    gap: var(--space-3);
+  }
+
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    flex-shrink: 0;
+  }
+
+  .back-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .back-btn:active {
+    transform: scale(0.92);
   }
 
   .history-header h1 {
-    font-size: var(--text-lg);
+    flex: 1;
+    font-size: var(--text-base);
     font-weight: var(--font-semibold);
     color: var(--text-primary);
     letter-spacing: var(--tracking-tight);
+    text-align: center;
   }
 
   .tx-count {
@@ -396,12 +428,17 @@
     border-radius: var(--radius-full);
     border: 1px solid var(--border-subtle);
     letter-spacing: var(--tracking-wide);
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .header-spacer {
+    width: 36px;
   }
 
   .history-content {
     flex: 1;
-    padding: 0 var(--space-5) var(--space-5);
-    padding-bottom: calc(var(--nav-height) + var(--space-4));
+    padding: 0 var(--space-5) var(--space-6);
   }
 
   /* Search and Filters Container */

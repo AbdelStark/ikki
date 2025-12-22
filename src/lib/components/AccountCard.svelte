@@ -92,23 +92,19 @@
         </button>
       </div>
 
-      {#if formattedUsdValue}
-        <div class="fiat-row">
-          <span class="fiat-value">≈ {formattedUsdValue}</span>
-          {#if $pricingLoading}
-            <span class="fiat-hint">Updating USD rate…</span>
-          {:else if usdRate}
-            <span class="fiat-hint">${usdRate.toFixed(2)} per ZEC</span>
-          {:else}
-            <span class="fiat-hint">USD value unavailable</span>
+      <div class="fiat-row" class:muted={!formattedUsdValue}>
+        {#if formattedUsdValue}
+          <span class="fiat-value">{formattedUsdValue}</span>
+          {#if usdRate && !isHidden}
+            <span class="fiat-rate">@ ${usdRate.toFixed(2)}</span>
           {/if}
-        </div>
-      {:else}
-        <div class="fiat-row muted">
-          <span class="fiat-value">≈ {isHidden ? maskedAmount() : "Fetching USD value…"}</span>
-          <span class="fiat-hint">Live conversion</span>
-        </div>
-      {/if}
+        {:else}
+          <span class="fiat-value">{isHidden ? maskedAmount() : "—"}</span>
+        {/if}
+        {#if $pricingLoading}
+          <span class="fiat-loading"></span>
+        {/if}
+      </div>
 
       {#if pendingAmount > 0}
         <div class="pending-amount">
@@ -324,12 +320,9 @@
 
   .fiat-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-2);
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: var(--tracking-tight);
   }
 
   .fiat-row.muted {
@@ -338,13 +331,25 @@
 
   .fiat-value {
     font-size: var(--text-base);
-    font-weight: var(--font-semibold);
+    font-weight: var(--font-medium);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-tight);
   }
 
-  .fiat-hint {
+  .fiat-rate {
     font-size: var(--text-2xs);
-    color: var(--text-tertiary);
-    letter-spacing: var(--tracking-wide);
+    color: var(--text-muted);
+    font-weight: var(--font-normal);
+    letter-spacing: var(--tracking-normal);
+  }
+
+  .fiat-loading {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--text-muted);
+    animation: pulse 1.5s ease-in-out infinite;
+    opacity: 0.5;
   }
 
   .pending-amount {

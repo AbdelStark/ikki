@@ -291,7 +291,6 @@
   .detail-content {
     flex: 1;
     padding: var(--space-6) var(--space-5);
-    padding-bottom: calc(var(--nav-height) + var(--space-6));
     max-width: var(--max-width);
     margin: 0 auto;
     width: 100%;

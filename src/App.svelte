@@ -28,7 +28,6 @@
   import TransactionDetail from "./routes/TransactionDetail.svelte";
 
   // Components
-  import BottomNav from "./lib/components/BottomNav.svelte";
   import Toast from "./lib/components/Toast.svelte";
   import InitialSync from "./lib/components/InitialSync.svelte";
   import SyncIndicator from "./lib/components/SyncIndicator.svelte";
@@ -290,7 +289,6 @@
         <TransactionDetail />
       {/if}
     </div>
-    <BottomNav />
 
     <!-- Background Sync Indicator -->
     {#if showSyncIndicator}
@@ -352,13 +350,12 @@
 
   .app-content {
     flex: 1;
-    padding-bottom: var(--nav-height);
     overflow-y: auto;
   }
 
   .toast-container {
     position: fixed;
-    bottom: calc(var(--nav-height) + var(--space-4));
+    bottom: var(--space-6);
     left: var(--space-4);
     right: var(--space-4);
     display: flex;

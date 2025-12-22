@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Settings, ChevronRight } from "lucide-svelte";
   import { wallet, balance, address } from "../lib/stores/wallet";
   import { sync, isSyncing } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
@@ -15,6 +16,14 @@
 </script>
 
 <div class="home">
+  <header class="home-header">
+    <div class="header-spacer"></div>
+    <span class="header-title">ikki</span>
+    <button class="settings-btn" onclick={() => ui.navigate("settings")} aria-label="Settings">
+      <Settings size={20} strokeWidth={1.5} />
+    </button>
+  </header>
+
   <div class="home-content">
     <AccountCard
       balance={$balance}
@@ -86,17 +95,64 @@
 <style>
   .home {
     min-height: 100%;
-    padding: var(--space-5);
-    padding-bottom: calc(var(--nav-height) + var(--space-4));
+    display: flex;
+    flex-direction: column;
     animation: fadeIn var(--duration-normal) var(--ease-out);
   }
 
+  .home-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-5);
+    max-width: var(--max-width);
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .header-spacer {
+    width: 36px;
+  }
+
+  .header-title {
+    font-size: var(--text-base);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .settings-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .settings-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .settings-btn:active {
+    transform: scale(0.92);
+  }
+
   .home-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
     max-width: var(--max-width);
     margin: 0 auto;
+    padding: 0 var(--space-5) var(--space-6);
+    width: 100%;
   }
 
   .actions {
