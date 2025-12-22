@@ -187,39 +187,41 @@
   }
 
   .header-title {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: var(--font-bold);
-    color: var(--text-primary);
-    letter-spacing: var(--tracking-tight);
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
   }
 
   .header-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 2px;
   }
 
   .header-btn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
-    border-radius: var(--radius-md);
-    color: var(--text-tertiary);
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: all var(--duration-fast) var(--ease-out);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .header-btn:hover:not(:disabled) {
     color: var(--text-primary);
-    background: var(--bg-hover);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .header-btn:active:not(:disabled) {
-    transform: scale(0.92);
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .header-btn:disabled {
@@ -294,29 +296,36 @@
   }
 
   .transaction-list {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 15, 17, 0.6) 0%,
+      rgba(12, 12, 14, 0.8) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     overflow: hidden;
     position: relative;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .transaction-list::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 10%;
-    right: 10%;
+    left: 5%;
+    right: 5%;
     height: 1px;
     background: linear-gradient(90deg,
       transparent,
-      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.08),
       transparent
     );
+    pointer-events: none;
   }
 
   .transaction-list > :global(*:not(:last-child)) {
-    border-bottom: 1px solid var(--divider);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .loading-state {

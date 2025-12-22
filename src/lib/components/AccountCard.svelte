@@ -143,62 +143,82 @@
     position: relative;
     border-radius: var(--radius-2xl);
     overflow: hidden;
+    transform: translateZ(0);
+    will-change: transform;
   }
 
   .card-bg {
     position: absolute;
     inset: 0;
-    background: var(--bg-card);
+    background: linear-gradient(
+      145deg,
+      rgba(20, 20, 22, 0.95) 0%,
+      rgba(12, 12, 14, 0.98) 100%
+    );
     border: 1px solid var(--border);
     border-radius: var(--radius-2xl);
+    transition: border-color 0.4s ease;
   }
 
-  /* Premium gradient overlay */
+  .card:hover .card-bg {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Premium gradient overlay - liquid metal effect */
   .card-bg::before {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.04) 0%,
-      rgba(255, 255, 255, 0.01) 30%,
-      transparent 60%
+      135deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.02) 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.01) 75%,
+      rgba(255, 255, 255, 0.03) 100%
     );
     border-radius: inherit;
     pointer-events: none;
   }
 
-  /* Top edge shine */
+  /* Top edge shine - enhanced */
   .card-bg::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 8%;
-    right: 8%;
+    left: 5%;
+    right: 5%;
     height: 1px;
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.15) 30%,
+      rgba(255, 255, 255, 0.15) 70%,
       transparent
     );
     pointer-events: none;
   }
 
-  /* Subtle ambient glow */
+  /* Subtle ambient glow - enhanced */
   .card-glow {
     position: absolute;
-    top: -50%;
+    top: -60%;
     left: 50%;
     transform: translateX(-50%);
-    width: 80%;
-    height: 100%;
+    width: 100%;
+    height: 120%;
     background: radial-gradient(
-      ellipse at center,
-      rgba(255, 255, 255, 0.03) 0%,
-      transparent 70%
+      ellipse 60% 40% at 50% 0%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 60%
     );
     pointer-events: none;
+    opacity: 0.8;
+    transition: opacity 0.4s ease;
+  }
+
+  .card:hover .card-glow {
+    opacity: 1;
   }
 
   .card-content {
@@ -268,28 +288,30 @@
   }
 
   .balance-int {
-    font-size: var(--text-2xl);
+    font-size: 2.25rem;
     font-weight: var(--font-bold);
     color: var(--text-primary);
-    letter-spacing: var(--tracking-tighter);
-    line-height: var(--leading-none);
+    letter-spacing: -0.03em;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
   }
 
   .balance-dec {
-    font-size: var(--text-lg);
+    font-size: 1.25rem;
     font-weight: var(--font-semibold);
-    color: var(--text-muted);
-    letter-spacing: var(--tracking-tight);
+    color: var(--text-tertiary);
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
 
   .balance-unit {
-    font-size: var(--text-sm);
-    font-weight: var(--font-medium);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
     color: var(--text-muted);
     margin-left: var(--space-2);
-    letter-spacing: var(--tracking-wide);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
 
   .toggle-visibility {

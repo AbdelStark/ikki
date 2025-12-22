@@ -101,57 +101,76 @@
     text-align: left;
     -webkit-tap-highlight-color: transparent;
     position: relative;
-    transition:
-      background var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .transaction-item:hover {
-    background: var(--bg-hover);
+  .transaction-item::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    transition: background 0.2s ease;
+    pointer-events: none;
+  }
+
+  .transaction-item:hover::before {
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .transaction-item:active {
-    background: var(--bg-active);
-    transform: scale(0.99);
+    transform: scale(0.995);
+  }
+
+  .transaction-item:active::before {
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .transaction-item.pending {
-    opacity: 0.65;
+    opacity: 0.6;
   }
 
   /* Icon container */
   .tx-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-md);
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     position: relative;
-    transition:
-      transform var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .transaction-item:hover .tx-icon {
-    transform: scale(1.04);
+    transform: scale(1.06);
   }
 
   .tx-icon.outgoing {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
+    background: linear-gradient(
+      145deg,
+      rgba(30, 30, 34, 0.8) 0%,
+      rgba(22, 22, 25, 0.9) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-tertiary);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .tx-icon.incoming {
     background: linear-gradient(
-      135deg,
-      rgba(228, 228, 231, 0.08) 0%,
-      rgba(228, 228, 231, 0.04) 100%
+      145deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 100%
     );
-    border: 1px solid rgba(228, 228, 231, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   /* Transaction info */

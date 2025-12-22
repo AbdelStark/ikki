@@ -64,28 +64,51 @@
   .icon-bg {
     position: absolute;
     inset: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      145deg,
+      rgba(25, 25, 28, 0.9) 0%,
+      rgba(18, 18, 20, 0.95) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-full);
-    transition:
-      background var(--duration-normal) var(--ease-out),
-      border-color var(--duration-normal) var(--ease-out),
-      transform var(--duration-normal) var(--ease-spring),
-      box-shadow var(--duration-normal) var(--ease-out);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
-  /* Gradient overlay for depth */
+  /* Gradient overlay for depth - liquid metal */
   .icon-bg::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.02) 40%,
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 50%,
       transparent 100%
     );
+    pointer-events: none;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+  }
+
+  /* Top shine line */
+  .icon-bg::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.12),
+      transparent
+    );
+    border-radius: inherit;
     pointer-events: none;
   }
 
@@ -97,29 +120,39 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: var(--text-primary);
-    transition: transform var(--duration-fast) var(--ease-out);
+    color: var(--text-secondary);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Hover states */
   .action-button:not(:disabled):hover .icon-bg {
-    background: var(--bg-elevated);
-    border-color: var(--border-emphasis);
-    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-3px);
     box-shadow:
-      0 8px 20px rgba(0, 0, 0, 0.4),
-      0 4px 8px rgba(0, 0, 0, 0.3);
+      0 12px 24px rgba(0, 0, 0, 0.4),
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .action-button:not(:disabled):hover .icon-bg::before {
+    opacity: 1;
+  }
+
+  .action-button:not(:disabled):hover .icon-content {
+    color: var(--text-primary);
+    transform: scale(1.05);
   }
 
   .action-button:not(:disabled):active .icon-bg {
-    transform: translateY(-2px) scale(0.96);
+    transform: translateY(-1px) scale(0.97);
     box-shadow:
       0 4px 12px rgba(0, 0, 0, 0.3),
-      0 2px 4px rgba(0, 0, 0, 0.2);
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .action-button:not(:disabled):active .icon-content {
-    transform: scale(0.92);
+    transform: scale(0.95);
   }
 
   /* Send variant hover - subtle red tint */

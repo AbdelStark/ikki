@@ -505,6 +505,49 @@ textarea::placeholder {
   100% { transform: translateX(100%); }
 }
 
+@keyframes liquidShine {
+  0% {
+    background-position: -200% 0;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 200% 0;
+    opacity: 0;
+  }
+}
+
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    ANIMATION UTILITY CLASSES
    ═══════════════════════════════════════════════════════════════ */
