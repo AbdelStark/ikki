@@ -28,7 +28,7 @@
   <div class="action-icon">
     <div class="icon-bg"></div>
     <div class="icon-content">
-      <Icon size={22} strokeWidth={2} />
+      <Icon size={20} strokeWidth={2} />
     </div>
   </div>
   <span class="action-label">{label}</span>
@@ -39,24 +39,25 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-6);
+    gap: 6px;
+    padding: var(--space-1);
     background: none;
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    min-width: 64px;
   }
 
   .action-button:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
     pointer-events: none;
   }
 
   .action-icon {
     position: relative;
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: var(--radius-full);
   }
 
@@ -154,9 +155,9 @@
   }
 
   .action-label {
-    font-size: var(--text-xs);
+    font-size: var(--text-2xs);
     font-weight: var(--font-medium);
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     letter-spacing: var(--tracking-wide);
     transition: color var(--duration-fast) var(--ease-out);
   }
