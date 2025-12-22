@@ -5,6 +5,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "wallet")]
 use crate::wallet::IkkiWallet;
 
 /// Status of a pending transaction
@@ -164,7 +166,10 @@ impl Default for SyncState {
 
 /// Global application state
 pub struct AppState {
+    #[cfg(feature = "wallet")]
     pub wallet: Arc<Mutex<Option<IkkiWallet>>>,
+    #[cfg(not(feature = "wallet"))]
+    pub wallet: Arc<Mutex<Option<()>>>,
     pub sync_state: Arc<SyncState>,
     pub pending_tx_state: Arc<PendingTxState>,
 }

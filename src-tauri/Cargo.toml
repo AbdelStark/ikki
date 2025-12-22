@@ -50,35 +50,59 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Environment
 dotenvy = "0.15"
 
-# TLS
+# TLS - use ring on mobile for better compatibility
+[target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
+rustls = { version = "0.23", features = ["ring"] }
+
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 rustls = { version = "0.23", features = ["aws-lc-rs"] }
 
-# Zcash - all from the same git revision for compatibility
-zcash_client_backend = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["lightwalletd-tonic-transport", "transparent-inputs", "orchard"] }
-zcash_client_sqlite = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["transparent-inputs", "unstable", "orchard"] }
-zcash_client_memory = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["transparent-inputs", "orchard"] }
-zcash_protocol = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6" }
-zcash_address = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6" }
-zcash_proofs = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["bundled-prover"] }
-zcash_keys = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["orchard", "sapling", "transparent-inputs"] }
-zcash_transparent = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6" }
-zcash_primitives = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6" }
-zip32 = "0.2"
+# Zcash - all from the same git revision for compatibility (desktop only)
+zcash_client_backend = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["lightwalletd-tonic-transport", "transparent-inputs", "orchard"], optional = true }
+zcash_client_sqlite = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["transparent-inputs", "unstable", "orchard"], optional = true }
+zcash_client_memory = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["transparent-inputs", "orchard"], optional = true }
+zcash_protocol = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", optional = true }
+zcash_address = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", optional = true }
+zcash_proofs = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["bundled-prover"], optional = true }
+zcash_keys = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", features = ["orchard", "sapling", "transparent-inputs"], optional = true }
+zcash_transparent = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", optional = true }
+zcash_primitives = { git = "https://github.com/zcash/librustzcash.git", rev = "9f47de6", optional = true }
+zip32 = { version = "0.2", optional = true }
 
-# gRPC
-tonic = { version = "0.14", features = ["tls-native-roots"] }
-prost = "0.14"
+# gRPC (desktop only)
+tonic = { version = "0.14", features = ["tls-native-roots"], optional = true }
+prost = { version = "0.14", optional = true }
 
-# Database
-rusqlite = { version = "0.37", features = ["bundled"] }
+# Database (desktop only)
+rusqlite = { version = "0.37", features = ["bundled"], optional = true }
 
 # Time
 time = "0.3"
 chrono = "0.4"
-nonempty = "0.11"
+nonempty = { version = "0.11", optional = true }
 
-# UUID
-uuid = { version = "1.11", features = ["v4"] }
+# UUID (desktop only for transaction IDs)
+uuid = { version = "1.11", features = ["v4"], optional = true }
+
+[features]
+default = ["wallet"]
+wallet = [
+    "zcash_client_backend",
+    "zcash_client_sqlite",
+    "zcash_client_memory",
+    "zcash_protocol",
+    "zcash_address",
+    "zcash_proofs",
+    "zcash_keys",
+    "zcash_transparent",
+    "zcash_primitives",
+    "zip32",
+    "tonic",
+    "prost",
+    "rusqlite",
+    "uuid",
+    "nonempty",
+]
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
