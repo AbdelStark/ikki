@@ -25,7 +25,7 @@ use zcash_client_sqlite::util::SystemClock;
 use zcash_client_sqlite::wallet::init::init_wallet_db;
 use zcash_proofs::prover::LocalTxProver;
 use zcash_protocol::ShieldedProtocol;
-use zcash_protocol::consensus::TEST_NETWORK;
+use zcash_protocol::consensus::MAIN_NETWORK;
 use zcash_protocol::memo::MemoBytes;
 use zcash_protocol::value::Zatoshis;
 use zip32::AccountId;
@@ -73,12 +73,12 @@ pub struct TransactionRecord {
 }
 
 type IkkiWalletDb =
-    WalletDb<rusqlite::Connection, zcash_protocol::consensus::TestNetwork, SystemClock, OsRng>;
+    WalletDb<rusqlite::Connection, zcash_protocol::consensus::MainNetwork, SystemClock, OsRng>;
 
 /// Helper to build and sign transaction with proper type annotations
 fn build_and_sign_transaction(
     db: &mut IkkiWalletDb,
-    params: &zcash_protocol::consensus::TestNetwork,
+    params: &zcash_protocol::consensus::MainNetwork,
     prover: &LocalTxProver,
     spending_keys: &SpendingKeys,
     proposal: &zcash_client_backend::proposal::Proposal<
@@ -88,7 +88,7 @@ fn build_and_sign_transaction(
 ) -> anyhow::Result<::nonempty::NonEmpty<zcash_protocol::TxId>> {
     create_proposed_transactions::<
         IkkiWalletDb,
-        zcash_protocol::consensus::TestNetwork,
+        zcash_protocol::consensus::MainNetwork,
         zcash_client_backend::data_api::wallet::input_selection::GreedyInputSelectorError,
         StandardFeeRule,
         zcash_client_backend::fees::ChangeError<
@@ -131,7 +131,7 @@ impl IkkiWallet {
 
         // Initialize wallet database
         let db_path = config.wallet_db_path();
-        let mut db = WalletDb::for_path(&db_path, TEST_NETWORK, SystemClock, OsRng)?;
+        let mut db = WalletDb::for_path(&db_path, MAIN_NETWORK, SystemClock, OsRng)?;
         init_wallet_db(&mut db, None)?;
 
         // Connect to lightwalletd with TLS
@@ -160,7 +160,7 @@ impl IkkiWallet {
 
         // Create unified spending key from seed
         let account_id = AccountId::ZERO;
-        let usk = UnifiedSpendingKey::from_seed(&TEST_NETWORK, &self.seed, account_id)
+        let usk = UnifiedSpendingKey::from_seed(&MAIN_NETWORK, &self.seed, account_id)
             .map_err(|e| anyhow::anyhow!("Failed to derive spending key: {e:?}"))?;
         let ufvk = usk.to_unified_full_viewing_key();
 
@@ -192,7 +192,7 @@ impl IkkiWallet {
         let db_cache = MemBlockCache::new();
         sync_run(
             &mut self.client,
-            &TEST_NETWORK,
+            &MAIN_NETWORK,
             &db_cache,
             &mut self.db,
             SYNC_BATCH_SIZE,
@@ -262,7 +262,7 @@ impl IkkiWallet {
 
         let address_record = addresses.first().unwrap();
         let address = address_record.address();
-        Ok(address.to_zcash_address(&TEST_NETWORK).to_string())
+        Ok(address.to_zcash_address(&MAIN_NETWORK).to_string())
     }
 
     /// Generate a new diversified receiving address
@@ -285,7 +285,7 @@ impl IkkiWallet {
             .get_next_available_address(*account_id, request)?
             .ok_or_else(|| anyhow::anyhow!("Failed to generate new address"))?;
 
-        Ok(address.to_zcash_address(NetworkType::Test).to_string())
+        Ok(address.to_zcash_address(NetworkType::Main).to_string())
     }
 
     /// Get all addresses for the wallet
@@ -299,7 +299,7 @@ impl IkkiWallet {
 
         Ok(addresses
             .iter()
-            .map(|addr| addr.address().to_zcash_address(&TEST_NETWORK).to_string())
+            .map(|addr| addr.address().to_zcash_address(&MAIN_NETWORK).to_string())
             .collect())
     }
 
@@ -365,7 +365,7 @@ impl IkkiWallet {
 
         // Derive spending key
         debug!("Deriving unified spending key for transaction");
-        let usk = UnifiedSpendingKey::from_seed(&TEST_NETWORK, &self.seed, AccountId::ZERO)
+        let usk = UnifiedSpendingKey::from_seed(&MAIN_NETWORK, &self.seed, AccountId::ZERO)
             .map_err(|e| anyhow::anyhow!("Failed to derive spending key: {e:?}"))?;
 
         // Create proposal
@@ -374,7 +374,7 @@ impl IkkiWallet {
 
         let proposal = propose_standard_transfer_to_address::<_, _, SqliteClientError>(
             &mut self.db,
-            &TEST_NETWORK,
+            &MAIN_NETWORK,
             StandardFeeRule::Zip317,
             *account_id,
             ConfirmationsPolicy::MIN,
@@ -395,7 +395,7 @@ impl IkkiWallet {
 
         let txids = build_and_sign_transaction(
             &mut self.db,
-            &TEST_NETWORK,
+            &MAIN_NETWORK,
             &prover,
             &spending_keys,
             &proposal,
@@ -620,7 +620,7 @@ impl IkkiWallet {
         use zcash_transparent::address::TransparentAddress;
 
         // Derive the unified spending key from seed
-        let usk = UnifiedSpendingKey::from_seed(&TEST_NETWORK, &self.seed, AccountId::ZERO)
+        let usk = UnifiedSpendingKey::from_seed(&MAIN_NETWORK, &self.seed, AccountId::ZERO)
             .map_err(|e| anyhow::anyhow!("Failed to derive spending key: {e:?}"))?;
 
         // Get the transparent account key
@@ -641,6 +641,6 @@ impl IkkiWallet {
         // Convert public key to transparent address
         let address = TransparentAddress::from_pubkey(&address_pubkey);
 
-        Ok(address.to_zcash_address(NetworkType::Test).to_string())
+        Ok(address.to_zcash_address(NetworkType::Main).to_string())
     }
 }
