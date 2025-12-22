@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Settings, ChevronRight } from "lucide-svelte";
+  import { Settings, RefreshCw } from "lucide-svelte";
   import { wallet, balance, address } from "../lib/stores/wallet";
-  import { sync, isSyncing } from "../lib/stores/sync";
+  import { sync, isSyncing, syncProgress } from "../lib/stores/sync";
   import { ui } from "../lib/stores/ui";
   import { transactions, transactionsLoaded } from "../lib/stores/transactions";
   import { totalPendingAmount } from "../lib/stores/pendingTransactions";
-  import { type Transaction } from "../lib/utils/tauri";
+  import { startBackgroundSync, getSyncStatus, getBalance } from "../lib/utils/tauri";
   import AccountCard from "../lib/components/AccountCard.svelte";
   import ActionButton from "../lib/components/ActionButton.svelte";
   import TransactionItem from "../lib/components/TransactionItem.svelte";
@@ -13,15 +13,85 @@
   // Use global transactions store
   $: recentTransactions = $transactions;
   $: loading = !$transactionsLoaded;
+
+  let syncPollInterval: ReturnType<typeof setInterval> | null = null;
+
+  async function handleSync() {
+    if ($isSyncing) return;
+
+    try {
+      sync.startSync(false);
+      await startBackgroundSync(false);
+      pollSyncStatus();
+    } catch (e) {
+      sync.setError(String(e));
+      ui.showToast(`Failed to start sync: ${e}`, "error");
+    }
+  }
+
+  function pollSyncStatus() {
+    if (syncPollInterval) clearInterval(syncPollInterval);
+
+    syncPollInterval = setInterval(async () => {
+      try {
+        const status = await getSyncStatus();
+
+        if (status.is_syncing) {
+          sync.updateProgress({
+            currentBlock: status.current_block,
+            targetBlock: status.target_block,
+            percentage: status.percentage,
+            isFirstSync: status.is_first_sync,
+            status: status.percentage > 0 ? "Syncing..." : "Connecting...",
+          });
+        } else {
+          if (syncPollInterval) clearInterval(syncPollInterval);
+          syncPollInterval = null;
+
+          try {
+            const newBalance = await getBalance();
+            wallet.updateBalance(newBalance);
+          } catch (e) {
+            console.error("Failed to fetch balance after sync:", e);
+          }
+
+          sync.completeSync();
+          ui.showToast("Wallet synced", "success");
+        }
+      } catch (e) {
+        console.error("Failed to poll sync status:", e);
+        if (syncPollInterval) clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 500);
+
+    setTimeout(() => {
+      if (syncPollInterval) {
+        clearInterval(syncPollInterval);
+        syncPollInterval = null;
+      }
+    }, 300000);
+  }
 </script>
 
 <div class="home">
   <header class="home-header">
     <div class="header-spacer"></div>
     <span class="header-title">ikki</span>
-    <button class="settings-btn" onclick={() => ui.navigate("settings")} aria-label="Settings">
-      <Settings size={20} strokeWidth={1.5} />
-    </button>
+    <div class="header-actions">
+      <button
+        class="header-btn"
+        class:syncing={$isSyncing}
+        onclick={handleSync}
+        disabled={$isSyncing}
+        aria-label="Sync wallet"
+      >
+        <RefreshCw size={18} strokeWidth={1.5} />
+      </button>
+      <button class="header-btn" onclick={() => ui.navigate("settings")} aria-label="Settings">
+        <Settings size={18} strokeWidth={1.5} />
+      </button>
+    </div>
   </header>
 
   <div class="home-content">
@@ -113,7 +183,7 @@
   }
 
   .header-spacer {
-    width: 36px;
+    width: 72px;
   }
 
   .header-title {
@@ -123,27 +193,45 @@
     letter-spacing: var(--tracking-tight);
   }
 
-  .settings-btn {
-    width: 36px;
-    height: 36px;
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .header-btn {
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     color: var(--text-tertiary);
     cursor: pointer;
     transition: all var(--duration-fast) var(--ease-out);
   }
 
-  .settings-btn:hover {
+  .header-btn:hover:not(:disabled) {
     color: var(--text-primary);
     background: var(--bg-hover);
   }
 
-  .settings-btn:active {
+  .header-btn:active:not(:disabled) {
     transform: scale(0.92);
+  }
+
+  .header-btn:disabled {
+    cursor: default;
+  }
+
+  .header-btn.syncing {
+    color: var(--text-secondary);
+  }
+
+  .header-btn.syncing :global(svg) {
+    animation: spin 1s linear infinite;
   }
 
   .home-content {
