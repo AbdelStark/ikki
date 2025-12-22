@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Loader2, Search, SlidersHorizontal, X } from "lucide-svelte";
+  import { Loader2, Search, SlidersHorizontal, X, ChevronDown, ArrowUpDown } from "lucide-svelte";
   import { type Transaction } from "../lib/utils/tauri";
   import { pendingTxList } from "../lib/stores/pendingTransactions";
   import { transactions as txStore, transactionsLoading, transactionsLoaded } from "../lib/stores/transactions";
@@ -11,6 +11,7 @@
   $: loading = !$transactionsLoaded;
   let error: string | null = null;
   let searchQuery = "";
+  let filtersExpanded = false;
   type TransactionTypeFilter = "all" | Transaction["tx_type"];
   type TransactionStatusFilter = "all" | Transaction["status"];
   type SortOption = "newest" | "oldest" | "amount-high" | "amount-low";
@@ -18,6 +19,15 @@
   let typeFilter: TransactionTypeFilter = "all";
   let statusFilter: TransactionStatusFilter = "all";
   let sortOption: SortOption = "newest";
+
+  // Count active filters (excluding defaults)
+  $: activeFilterCount = (typeFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0) + (sortOption !== "newest" ? 1 : 0);
+
+  function clearAllFilters() {
+    typeFilter = "all";
+    statusFilter = "all";
+    sortOption = "newest";
+  }
 
   const typeOptions: { value: TransactionTypeFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -151,67 +161,123 @@
   </header>
 
   <div class="history-content">
-    <div class="filters-panel">
-      <div class="search-bar">
-        <Search size={16} />
-        <input
-          type="text"
-          placeholder="Search by address, memo, or tx ID"
-          bind:value={searchQuery}
-          aria-label="Search transactions"
-        />
-        {#if searchQuery.length > 0}
-          <button class="clear-search" on:click={() => (searchQuery = "")} aria-label="Clear search">
-            <X size={14} />
-          </button>
-        {/if}
+    <div class="search-filters-container">
+      <!-- Search Bar Row -->
+      <div class="search-row">
+        <div class="search-bar">
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Search transactions..."
+            bind:value={searchQuery}
+            aria-label="Search transactions"
+          />
+          {#if searchQuery.length > 0}
+            <button class="clear-search" on:click={() => (searchQuery = "")} aria-label="Clear search">
+              <X size={14} />
+            </button>
+          {/if}
+        </div>
+
+        <button
+          class="filter-toggle"
+          class:active={filtersExpanded || activeFilterCount > 0}
+          on:click={() => filtersExpanded = !filtersExpanded}
+          aria-label="Toggle filters"
+          aria-expanded={filtersExpanded}
+        >
+          <SlidersHorizontal size={16} />
+          {#if activeFilterCount > 0}
+            <span class="filter-badge">{activeFilterCount}</span>
+          {/if}
+        </button>
       </div>
 
-      <div class="filter-row">
-        <div class="filter-group">
-          <div class="filter-label">Type</div>
-          <div class="chip-row">
-            {#each typeOptions as option}
-              <button
-                class="filter-chip"
-                class:active={typeFilter === option.value}
-                on:click={() => (typeFilter = option.value)}
-              >
-                {option.label}
+      <!-- Collapsible Filters Panel -->
+      {#if filtersExpanded}
+        <div class="filters-panel" class:expanded={filtersExpanded}>
+          <div class="filters-header">
+            <span class="filters-title">Filters & Sort</span>
+            {#if activeFilterCount > 0}
+              <button class="clear-filters" on:click={clearAllFilters}>
+                Clear all
               </button>
-            {/each}
+            {/if}
           </div>
-        </div>
 
-        <div class="filter-group">
-          <div class="filter-label">Status</div>
-          <div class="chip-row">
-            {#each statusOptions as option}
-              <button
-                class="filter-chip"
-                class:active={statusFilter === option.value}
-                on:click={() => (statusFilter = option.value)}
-              >
-                {option.label}
-              </button>
-            {/each}
-          </div>
-        </div>
-
-        <div class="filter-group sort-group">
-          <div class="filter-label">
-            <SlidersHorizontal size={14} />
-            <span>Sort</span>
-          </div>
-          <div class="sort-select">
-            <select bind:value={sortOption} aria-label="Sort transactions">
-              {#each sortOptions as option}
-                <option value={option.value}>{option.label}</option>
+          <div class="filter-section">
+            <div class="filter-label">Type</div>
+            <div class="chip-row">
+              {#each typeOptions as option}
+                <button
+                  class="filter-chip"
+                  class:active={typeFilter === option.value}
+                  on:click={() => (typeFilter = option.value)}
+                >
+                  {option.label}
+                </button>
               {/each}
-            </select>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <div class="filter-label">Status</div>
+            <div class="chip-row">
+              {#each statusOptions as option}
+                <button
+                  class="filter-chip"
+                  class:active={statusFilter === option.value}
+                  on:click={() => (statusFilter = option.value)}
+                >
+                  {option.label}
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <div class="filter-label">
+              <ArrowUpDown size={12} />
+              <span>Sort by</span>
+            </div>
+            <div class="chip-row">
+              {#each sortOptions as option}
+                <button
+                  class="filter-chip"
+                  class:active={sortOption === option.value}
+                  on:click={() => (sortOption = option.value)}
+                >
+                  {option.label}
+                </button>
+              {/each}
+            </div>
           </div>
         </div>
-      </div>
+      {/if}
+
+      <!-- Active Filters Summary (when collapsed) -->
+      {#if !filtersExpanded && activeFilterCount > 0}
+        <div class="active-filters-summary">
+          {#if typeFilter !== "all"}
+            <span class="active-tag">
+              {typeOptions.find(o => o.value === typeFilter)?.label}
+              <button on:click={() => typeFilter = "all"}><X size={10} /></button>
+            </span>
+          {/if}
+          {#if statusFilter !== "all"}
+            <span class="active-tag">
+              {statusOptions.find(o => o.value === statusFilter)?.label}
+              <button on:click={() => statusFilter = "all"}><X size={10} /></button>
+            </span>
+          {/if}
+          {#if sortOption !== "newest"}
+            <span class="active-tag">
+              {sortOptions.find(o => o.value === sortOption)?.label}
+              <button on:click={() => sortOption = "newest"}><X size={10} /></button>
+            </span>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     {#if loading}
@@ -338,27 +404,38 @@
     padding-bottom: calc(var(--nav-height) + var(--space-4));
   }
 
-  .filters-panel {
+  /* Search and Filters Container */
+  .search-filters-container {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
     margin-bottom: var(--space-4);
-    box-shadow: var(--shadow-sm);
   }
 
-  .search-bar {
+  /* Search Row */
+  .search-row {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3);
-    color: var(--text-secondary);
+  }
+
+  .search-bar {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-4);
+    color: var(--text-tertiary);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
+  }
+
+  .search-bar:focus-within {
+    border-color: var(--border-emphasis);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
   }
 
   .search-bar input {
@@ -368,6 +445,10 @@
     color: var(--text-primary);
     font-size: var(--text-sm);
     outline: none;
+  }
+
+  .search-bar input::placeholder {
+    color: var(--text-tertiary);
   }
 
   .clear-search {
@@ -380,6 +461,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: color var(--duration-fast) var(--ease-out),
+                background var(--duration-fast) var(--ease-out);
   }
 
   .clear-search:hover {
@@ -387,26 +470,122 @@
     background: var(--bg-hover);
   }
 
-  .filter-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--space-3);
+  /* Filter Toggle Button */
+  .filter-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    flex-shrink: 0;
   }
 
-  .filter-group {
+  .filter-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--border-emphasis);
+    background: var(--bg-elevated);
+  }
+
+  .filter-toggle.active {
+    color: var(--text-primary);
+    border-color: var(--border-emphasis);
+    background: var(--bg-elevated);
+  }
+
+  .filter-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: var(--accent);
+    color: var(--bg-primary);
+    font-size: 10px;
+    font-weight: var(--font-bold);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Collapsible Filters Panel */
+  .filters-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    animation: slideDown var(--duration-normal) var(--ease-out);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .filters-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .filters-title {
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .clear-filters {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast) var(--ease-out),
+                background var(--duration-fast) var(--ease-out);
+  }
+
+  .clear-filters:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .filter-section {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
 
   .filter-label {
-    font-size: var(--text-xs);
-    font-weight: var(--font-semibold);
+    font-size: var(--text-2xs);
+    font-weight: var(--font-medium);
     color: var(--text-tertiary);
     letter-spacing: var(--tracking-wide);
     display: flex;
     align-items: center;
     gap: var(--space-1);
+    text-transform: uppercase;
   }
 
   .chip-row {
@@ -419,46 +598,62 @@
     border: 1px solid var(--border);
     background: var(--bg-elevated);
     color: var(--text-secondary);
-    padding: var(--space-1) var(--space-3);
+    padding: 6px 12px;
     border-radius: var(--radius-full);
     cursor: pointer;
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
-    letter-spacing: var(--tracking-wide);
-    transition:
-      background var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+    transition: all var(--duration-fast) var(--ease-out);
   }
 
   .filter-chip:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-    transform: translateY(-1px);
+    border-color: var(--border-emphasis);
   }
 
   .filter-chip.active {
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
-    border-color: var(--border-emphasis);
-    box-shadow: var(--shadow-xs);
+    border-color: var(--text-secondary);
   }
 
-  .sort-group {
-    align-self: flex-start;
+  /* Active Filters Summary */
+  .active-filters-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    animation: fadeIn var(--duration-fast) var(--ease-out);
   }
 
-  .sort-select select {
-    width: 100%;
-    background: var(--bg-elevated);
+  .active-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-full);
+    padding: 4px 8px 4px 12px;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .active-tag button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: var(--radius-full);
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .active-tag button:hover {
     color: var(--text-primary);
-    font-size: var(--text-sm);
-    appearance: none;
-    outline: none;
+    background: var(--bg-hover);
   }
 
   .filter-empty {
