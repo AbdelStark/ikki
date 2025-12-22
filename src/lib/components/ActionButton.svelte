@@ -105,11 +105,35 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.12),
+      rgba(255, 255, 255, 0.15),
       transparent
     );
     border-radius: inherit;
     pointer-events: none;
+  }
+
+  /* Shimmer effect on hover */
+  .action-icon::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.08),
+      transparent
+    );
+    transform: skewX(-15deg);
+    transition: none;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .action-button:not(:disabled):hover .action-icon::after {
+    animation: shimmerSlide 0.8s ease-out;
   }
 
   .icon-content {

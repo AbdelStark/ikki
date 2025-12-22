@@ -77,33 +77,36 @@
 
     <!-- Balance display -->
     <div class="balance-section">
-      <div class="balance-row">
-        <div class="balance">
-          <span class="balance-int">{intPart}</span>
-          <span class="balance-dec">.{decPart}</span>
-          <span class="balance-unit">ZEC</span>
+      <div class="balance-container">
+        <div class="balance-glow"></div>
+        <div class="balance-row">
+          <div class="balance">
+            <span class="balance-int">{intPart}</span>
+            <span class="balance-dec">.{decPart}</span>
+            <span class="balance-unit">ZEC</span>
+          </div>
+          <button class="toggle-visibility" onclick={toggleBalanceVisibility} aria-label={isHidden ? "Show balances" : "Hide balances"}>
+            {#if isHidden}
+              <EyeOff size={16} strokeWidth={2.25} />
+            {:else}
+              <Eye size={16} strokeWidth={2.25} />
+            {/if}
+          </button>
         </div>
-        <button class="toggle-visibility" onclick={toggleBalanceVisibility} aria-label={isHidden ? "Show balances" : "Hide balances"}>
-          {#if isHidden}
-            <EyeOff size={16} strokeWidth={2.25} />
-          {:else}
-            <Eye size={16} strokeWidth={2.25} />
-          {/if}
-        </button>
-      </div>
 
-      <div class="fiat-row" class:muted={!formattedUsdValue}>
-        {#if formattedUsdValue}
-          <span class="fiat-value">{formattedUsdValue}</span>
-          {#if usdRate && !isHidden}
-            <span class="fiat-rate">@ ${usdRate.toFixed(2)}</span>
+        <div class="fiat-row" class:muted={!formattedUsdValue}>
+          {#if formattedUsdValue}
+            <span class="fiat-value">{formattedUsdValue}</span>
+            {#if usdRate && !isHidden}
+              <span class="fiat-rate">@ ${usdRate.toFixed(2)}</span>
+            {/if}
+          {:else}
+            <span class="fiat-value">{isHidden ? maskedAmount() : "—"}</span>
           {/if}
-        {:else}
-          <span class="fiat-value">{isHidden ? maskedAmount() : "—"}</span>
-        {/if}
-        {#if $pricingLoading}
-          <span class="fiat-loading"></span>
-        {/if}
+          {#if $pricingLoading}
+            <span class="fiat-loading"></span>
+          {/if}
+        </div>
       </div>
 
       {#if pendingAmount > 0}
@@ -275,7 +278,31 @@
     margin-bottom: var(--space-4);
   }
 
+  .balance-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .balance-glow {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 60%;
+    height: 200%;
+    background: radial-gradient(
+      ellipse 100% 80% at 0% 50%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+    animation: glowPulse 4s ease-in-out infinite;
+  }
+
   .balance-row {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -288,30 +315,42 @@
   }
 
   .balance-int {
-    font-size: 2.25rem;
+    font-size: 2.5rem;
     font-weight: var(--font-bold);
     color: var(--text-primary);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.035em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+    text-shadow:
+      0 0 60px rgba(255, 255, 255, 0.15),
+      0 0 30px rgba(255, 255, 255, 0.1);
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.85) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .balance-dec {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
     font-weight: var(--font-semibold);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    opacity: 0.6;
   }
 
   .balance-unit {
-    font-size: var(--text-xs);
-    font-weight: var(--font-semibold);
+    font-size: 10px;
+    font-weight: var(--font-bold);
     color: var(--text-muted);
-    margin-left: var(--space-2);
-    letter-spacing: 0.05em;
+    margin-left: 8px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
+    opacity: 0.5;
   }
 
   .toggle-visibility {

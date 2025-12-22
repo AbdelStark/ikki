@@ -74,7 +74,7 @@
   }
 </script>
 
-<div class="home">
+<div class="home noise-overlay">
   <header class="home-header">
     <div class="header-spacer"></div>
     <span class="header-title">ikki</span>
@@ -95,21 +95,23 @@
   </header>
 
   <div class="home-content">
-    <AccountCard
-      balance={$balance}
-      address={$address}
-      syncing={$isSyncing ?? false}
-      pendingAmount={$totalPendingAmount}
-    />
+    <div class="animate-card">
+      <AccountCard
+        balance={$balance}
+        address={$address}
+        syncing={$isSyncing ?? false}
+        pendingAmount={$totalPendingAmount}
+      />
+    </div>
 
-    <div class="actions">
+    <div class="actions animate-actions">
       <ActionButton variant="send" onclick={() => ui.navigate("send")} />
       <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
       <ActionButton variant="buy" disabled />
       <ActionButton variant="swap" disabled />
     </div>
 
-    <section class="recent-section">
+    <section class="recent-section animate-section">
       <div class="section-header">
         <h3>Recent Activity</h3>
         {#if recentTransactions.length > 0}
@@ -169,7 +171,30 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    animation: fadeIn var(--duration-normal) var(--ease-out);
+    background: linear-gradient(
+      180deg,
+      var(--bg-primary) 0%,
+      rgba(8, 8, 10, 1) 100%
+    );
+  }
+
+  /* Staggered entrance animations */
+  .animate-card {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.05s;
+    opacity: 0;
+  }
+
+  .animate-actions {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.15s;
+    opacity: 0;
+  }
+
+  .animate-section {
+    animation: floatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 0.25s;
+    opacity: 0;
   }
 
   .home-header {
@@ -264,35 +289,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-2);
   }
 
   .section-header h3 {
-    font-size: var(--text-2xs);
+    font-size: 10px;
     font-weight: var(--font-semibold);
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: var(--tracking-widest);
+    letter-spacing: 0.12em;
   }
 
   .see-all {
     background: none;
     border: none;
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-size: var(--text-2xs);
     font-weight: var(--font-medium);
     cursor: pointer;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    transition:
-      color var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out);
-    letter-spacing: var(--tracking-wide);
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    letter-spacing: 0.02em;
   }
 
   .see-all:hover {
-    color: var(--text-secondary);
-    background: var(--bg-hover);
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .see-all:active {
+    transform: scale(0.95);
   }
 
   .transaction-list {
@@ -391,24 +418,30 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-12) var(--space-4);
+    padding: var(--space-14) var(--space-4);
     text-align: center;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    background: linear-gradient(
+      180deg,
+      rgba(15, 15, 17, 0.5) 0%,
+      rgba(12, 12, 14, 0.7) 100%
+    );
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .empty-icon {
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     margin-bottom: var(--space-4);
-    opacity: 0.3;
+    opacity: 0.25;
+    animation: softPulse 3s ease-in-out infinite;
   }
 
   .empty-title {
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
-    color: var(--text-primary);
+    color: var(--text-secondary);
     margin-bottom: var(--space-1);
+    letter-spacing: -0.01em;
   }
 
   .empty-subtitle {
