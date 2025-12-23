@@ -4,11 +4,18 @@
 
 mod commands;
 mod state;
+pub mod swap;
 pub mod wallet;
 
 use state::AppState;
+use crate::swap::db::open_swap_db;
 
 pub fn run() {
+    // Initialize rustls crypto provider (required before any TLS operations)
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -20,8 +27,24 @@ pub fn run() {
     // Load environment variables
     dotenvy::dotenv().ok();
 
+    // Initialize swap database
+    let swap_db = match open_swap_db() {
+        Ok(conn) => Some(conn),
+        Err(e) => {
+            tracing::warn!("Failed to open swap database: {}", e);
+            None
+        }
+    };
+
+    let app_state = AppState {
+        wallet: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+        sync_state: std::sync::Arc::new(state::SyncState::new()),
+        pending_tx_state: std::sync::Arc::new(state::PendingTxState::new()),
+        swap_db: std::sync::Arc::new(std::sync::Mutex::new(swap_db)),
+    };
+
     tauri::Builder::default()
-        .manage(AppState::new())
+        .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // Wallet commands
             commands::wallet::check_wallet_exists,
@@ -47,6 +70,15 @@ pub fn run() {
             commands::transactions::get_pending_transactions,
             commands::transactions::get_pending_transaction,
             commands::transactions::dismiss_pending_transaction,
+            // Swap commands
+            commands::swap::get_swap_receiving_address,
+            commands::swap::generate_ephemeral_address,
+            commands::swap::save_swap,
+            commands::swap::update_swap_status,
+            commands::swap::get_swap_history,
+            commands::swap::get_active_swaps,
+            commands::swap::check_transparent_balance,
+            commands::swap::shield_transparent_funds,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

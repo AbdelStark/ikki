@@ -143,35 +143,36 @@
     <!-- Progress Section -->
     <div class="progress-section">
       <div class="progress-ring-container">
-        <svg class="progress-ring" viewBox="0 0 120 120">
-          <circle
-            class="progress-ring-bg"
-            cx="60"
-            cy="60"
-            r="52"
-            fill="none"
-            stroke-width="4"
-          />
-          <circle
-            class="progress-ring-fill"
-            cx="60"
-            cy="60"
-            r="52"
-            fill="none"
-            stroke-width="4"
-            stroke-dasharray={2 * Math.PI * 52}
-            stroke-dashoffset={syncing && percentage < 5 ? 0 : 2 * Math.PI * 52 * (1 - percentage / 100)}
-            class:indeterminate={syncing && percentage < 5}
-          />
-        </svg>
-        <div class="progress-text">
-          {#if syncing && percentage < 5}
-            <div class="spinner"></div>
-          {:else}
+        {#if percentage >= 5}
+          <!-- Show progress ring only when we have real progress -->
+          <svg class="progress-ring" viewBox="0 0 120 120">
+            <circle
+              class="progress-ring-bg"
+              cx="60"
+              cy="60"
+              r="52"
+              fill="none"
+              stroke-width="4"
+            />
+            <circle
+              class="progress-ring-fill"
+              cx="60"
+              cy="60"
+              r="52"
+              fill="none"
+              stroke-width="4"
+              stroke-dasharray={2 * Math.PI * 52}
+              stroke-dashoffset={2 * Math.PI * 52 * (1 - percentage / 100)}
+            />
+          </svg>
+          <div class="progress-text">
             <span class="progress-percentage">{Math.round(percentage)}</span>
             <span class="progress-symbol">%</span>
-          {/if}
-        </div>
+          </div>
+        {:else}
+          <!-- Show simple spinner when no real progress -->
+          <div class="spinner-large"></div>
+        {/if}
       </div>
 
       <div class="progress-details">
@@ -366,6 +367,15 @@
     border-top-color: var(--text-primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+  }
+
+  .spinner-large {
+    width: 80px;
+    height: 80px;
+    border: 3px solid var(--border);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
 
   .progress-percentage {

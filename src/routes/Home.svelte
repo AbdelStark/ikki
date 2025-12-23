@@ -113,7 +113,7 @@
       <ActionButton variant="send" onclick={() => ui.navigate("send")} />
       <ActionButton variant="receive" onclick={() => ui.navigate("receive")} />
       <ActionButton variant="buy" disabled />
-      <ActionButton variant="swap" disabled />
+      <ActionButton variant="swap" onclick={() => ui.navigate("swap")} />
     </div>
 
     <section class="recent-section animate-section">

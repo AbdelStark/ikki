@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
+use rusqlite::Connection;
 use crate::wallet::IkkiWallet;
 
 /// Status of a pending transaction
@@ -167,6 +168,7 @@ pub struct AppState {
     pub wallet: Arc<Mutex<Option<IkkiWallet>>>,
     pub sync_state: Arc<SyncState>,
     pub pending_tx_state: Arc<PendingTxState>,
+    pub swap_db: Arc<std::sync::Mutex<Option<Connection>>>,
 }
 
 impl AppState {
@@ -175,6 +177,7 @@ impl AppState {
             wallet: Arc::new(Mutex::new(None)),
             sync_state: Arc::new(SyncState::new()),
             pending_tx_state: Arc::new(PendingTxState::new()),
+            swap_db: Arc::new(std::sync::Mutex::new(None)),
         }
     }
 }

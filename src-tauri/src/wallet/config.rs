@@ -40,7 +40,7 @@ impl ZcashConfig {
     ///
     /// Birthday height is the block height when the wallet was created.
     /// Using the correct birthday significantly speeds up initial sync.
-    /// If not provided, defaults to a recent testnet block.
+    /// If not provided, defaults to a recent mainnet block.
     pub fn from_seed_with_birthday(
         seed_phrase: &str,
         birthday_height: Option<u64>,
@@ -57,10 +57,11 @@ impl ZcashConfig {
 
         Ok(Self {
             seed_phrase: seed_phrase.to_string(),
-            birthday_height: birthday_height.unwrap_or(3717528),
-            lightwalletd_url: "https://testnet.zec.rocks:443".to_string(),
+            // Default to a recent mainnet block (December 2024)
+            birthday_height: birthday_height.unwrap_or(2700000),
+            lightwalletd_url: "https://zec.rocks:443".to_string(),
             data_dir,
-            network: Network::Testnet,
+            network: Network::Mainnet,
         })
     }
 }
