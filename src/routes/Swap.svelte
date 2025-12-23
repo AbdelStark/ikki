@@ -25,6 +25,7 @@
     getPendingTransaction,
     updateSwapStatus,
     saveSwap,
+    startBackgroundSync,
   } from "../lib/utils/tauri";
   import type { Asset, ActiveSwap, SwapRecord } from "../lib/types/swap";
   import AssetSelector from "../lib/components/AssetSelector.svelte";
@@ -119,6 +120,12 @@
         if (status.status === 'COMPLETED') {
           ui.showToast('Swap completed successfully!', 'success');
           stopStatusPolling();
+          // Trigger sync to pick up the incoming transaction
+          try {
+            await startBackgroundSync(false);
+          } catch (e) {
+            console.error('Failed to start sync after swap:', e);
+          }
         } else if (status.status === 'FAILED') {
           ui.showToast('Swap failed', 'error');
           stopStatusPolling();
